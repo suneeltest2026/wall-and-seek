@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Wall &amp; Seek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15171a;
+    --surface:#1e2124;
+    --surface-2:#262a2e;
+    --surface-3:#2f3438;
+    --concrete:#9ba1a6;
+    --yellow:#ffc93c;
+    --seeker:#ff5d5d;
+    --hider:#3ddc97;
+    --brick:#b0492e;
+    --brick-dark:#8a381f;
+    --text:#f3f1ea;
+    --text-dim:#9ba1a6;
+    --danger:#ff5d5d;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{
+    max-width:520px;
+    margin:0 auto;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    padding-bottom:40px;
+  }
+  h1,h2,h3{
+    font-family:'Anton',sans-serif;
+    font-weight:400;
+    letter-spacing:0.5px;
+    margin:0;
+  }
+  .logo{
+    font-family:'Bungee',cursive;
+    font-size:clamp(28px,8vw,40px);
+    letter-spacing:1px;
+    line-height:1.1;
+    text-align:center;
+  }
+  .logo .hi{color:var(--hider);}
+  .logo .sk{color:var(--seeker);}
+  .caution-stripe{
+    height:14px;
+    width:100%;
+    background:repeating-linear-gradient(45deg, var(--yellow) 0 18px, var(--bg) 18px 36px);
+    flex-shrink:0;
+  }
+  .topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 20px 8px;
+  }
+  .topbar .room-code{
+    font-family:'Anton',sans-serif;
+    letter-spacing:2px;
+    color:var(--yellow);
+    font-size:14px;
+    background:var(--surface-2);
+    padding:6px 10px;
+    border-radius:8px;
+  }
+  .content{
+    flex:1;
+    padding:16px 20px 24px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .card{
+    background:var(--surface);
+    border-radius:var(--radius);
+    padding:18px;
+    border:1px solid var(--surface-3);
+  }
+  .btn{
+    font-family:'Anton',sans-serif;
+    letter-spacing:0.5px;
+    font-size:16px;
+    padding:14px 18px;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+    text-align:center;
+    transition:transform .08s ease, filter .15s ease;
+    width:100%;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .btn-primary{background:var(--yellow);color:#1a1a1a;}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.08);}
+  .btn-hider{background:var(--hider);color:#0e2119;}
+  .btn-seeker{background:var(--seeker);color:#2a0a0a;}
+  .btn-ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--surface-3);}
+  .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  .btn-row{display:flex;gap:10px;}
+  input[type=text], input[type=number]{
+    width:100%;
+    background:var(--surface-2);
+    border:1px solid var(--surface-3);
+    color:var(--text);
+    padding:13px 14px;
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-size:16px;
+  }
+  input:focus{outline:2px solid var(--yellow);}
+  label{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:var(--text-dim);
+    font-weight:600;
+    display:block;
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:14px;}
+  .subtle{color:var(--text-dim);font-size:14px;line-height:1.5;}
+  .pill{
+    display:inline-block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.8px;
+    font-weight:700;
+    padding:4px 9px;
+    border-radius:999px;
+  }
+  .pill-hider{background:rgba(61,220,151,0.15);color:var(--hider);}
+  .pill-seeker{background:rgba(255,93,93,0.15);color:var(--seeker);}
+  .pill-out{background:rgba(155,161,166,0.15);color:var(--concrete);}
+  .pill-host{background:rgba(255,201,60,0.15);color:var(--yellow);}
+  .player-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--surface-3);
+    gap:10px;
+  }
+  .player-row:last-child{border-bottom:none;}
+  .player-name{font-weight:600;font-size:15px;}
+  .player-name .you{color:var(--yellow);font-size:12px;margin-left:6px;font-weight:700;}
+  .timer{
+    font-family:'Anton',sans-serif;
+    font-size:52px;
+    text-align:center;
+    letter-spacing:2px;
+    line-height:1;
+  }
+  .timer-label{
+    text-align:center;
+    text-transform:uppercase;
+    letter-spacing:2px;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:6px;
+    font-weight:700;
+  }
+  .brick-bg{
+    background-color:var(--brick);
+    background-image:
+      linear-gradient(335deg, rgba(0,0,0,.28) 23px, transparent 23px),
+      linear-gradient(155deg, rgba(0,0,0,.28) 23px, transparent 23px),
+      linear-gradient(335deg, rgba(0,0,0,.28) 23px, transparent 23px),
+      linear-gradient(155deg, rgba(0,0,0,.28) 23px, transparent 23px);
+    background-size:58px 58px;
+    background-position:0 0, 0 0, 29px 29px, 29px 29px;
+    color:#fff;
+    border-radius:var(--radius);
+    padding:22px;
+    text-align:center;
+  }
+  .status-banner{
+    text-align:center;
+    padding:22px;
+    border-radius:var(--radius);
+  }
+  .log{
+    max-height:150px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column-reverse;
+    gap:6px;
+    font-size:13px;
+    color:var(--text-dim);
+  }
+  .log-item span{color:var(--text);font-weight:600;}
+  .rules-fab{
+    position:fixed;
+    bottom:18px;
+    right:calc(50% - 260px + 18px);
+    background:var(--surface-2);
+    border:1px solid var(--surface-3);
+    color:var(--text);
+    width:46px;height:46px;
+    border-radius:50%;
+    font-family:'Anton',sans-serif;
+    font-size:18px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    z-index:50;
+    box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  }
+  @media (max-width:560px){
+    .rules-fab{right:18px;}
+  }
+  .modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.65);
+    display:flex;align-items:flex-end;justify-content:center;
+    z-index:100;
+  }
+  .modal{
+    background:var(--surface);
+    border-top-left-radius:20px;
+    border-top-right-radius:20px;
+    max-width:520px;
+    width:100%;
+    max-height:82vh;
+    overflow-y:auto;
+    padding:22px 20px 30px;
+    border-top:3px solid var(--yellow);
+  }
+  .modal h2{margin-bottom:14px;}
+  .rule-block{margin-bottom:16px;}
+  .rule-block .num{
+    display:inline-flex;
+    align-items:center;justify-content:center;
+    width:24px;height:24px;
+    background:var(--yellow);
+    color:#1a1a1a;
+    font-family:'Anton',sans-serif;
+    border-radius:50%;
+    font-size:13px;
+    margin-right:8px;
+  }
+  .rule-title{font-weight:800;font-size:15px;margin-bottom:4px;}
+  .close-modal{
+    position:sticky;top:0;
+    float:right;
+    background:var(--surface-2);
+    border:none;color:var(--text);
+    width:32px;height:32px;border-radius:50%;
+    font-size:16px;cursor:pointer;
+  }
+  .center{text-align:center;}
+  .stat-grid{display:flex;gap:10px;}
+  .stat-box{
+    flex:1;
+    background:var(--surface-2);
+    border-radius:10px;
+    padding:12px 8px;
+    text-align:center;
+  }
+  .stat-box .n{font-family:'Anton',sans-serif;font-size:22px;}
+  .stat-box .l{font-size:10px;text-transform:uppercase;color:var(--text-dim);letter-spacing:0.8px;margin-top:2px;}
+  .error-text{color:var(--danger);font-size:13px;margin-top:-8px;}
+  .divider{height:1px;background:var(--surface-3);margin:4px 0;}
+  select{
+    width:100%;
+    background:var(--surface-2);
+    border:1px solid var(--surface-3);
+    color:var(--text);
+    padding:13px 14px;
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-size:16px;
+  }
+  .loading-dot{
+    text-align:center;color:var(--text-dim);font-size:13px;padding:20px 0;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------- CONSTANTS ----------
+const DEFAULT_SETTINGS = {
+  seekerCount: 1,
+  wallUses: 3,
+  wallShieldSec: 8,
+  wallCooldownSec: 15,
+  calloutUses: 2,
+  hideSec: 30,
+  seekSec: 600,
+  graceSec: 15
+};
+
+// ---------- STATE ----------
+let S = {
+  screen: 'landing', // landing, lobby, hiding, seeking, ended
+  username: '',
+  code: '',
+  room: null,
+  error: '',
+  showRules: false,
+  busy: false
+};
+
+let pollTimer = null;
+let tickTimer = null;
+
+// ---------- STORAGE HELPERS (backed by our own Express API on Render) ----------
+async function loadRoom(code){
+  try{
+    const res = await fetch('/api/room/' + encodeURIComponent(code));
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){
+    return null;
+  }
+}
+async function saveRoom(room){
+  room.updatedAt = Date.now();
+  try{
+    await fetch('/api/room/' + encodeURIComponent(room.code), {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(room)
+    });
+  }catch(e){}
+}
+async function saveSession(){
+  try{
+    localStorage.setItem('wallandseek-session', JSON.stringify({username:S.username, code:S.code}));
+  }catch(e){}
+}
+async function clearSession(){
+  try{
+    localStorage.removeItem('wallandseek-session');
+  }catch(e){}
+}
+function readSession(){
+  try{
+    const raw = localStorage.getItem('wallandseek-session');
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){
+    return null;
+  }
+}
+
+// ---------- UTIL ----------
+function genCode(){
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let c='';
+  for(let i=0;i<4;i++) c += letters[Math.floor(Math.random()*letters.length)];
+  return c;
+}
+function now(){ return Date.now(); }
+function fmtTime(ms){
+  if(ms<0) ms=0;
+  const totalSec = Math.ceil(ms/1000);
+  const m = Math.floor(totalSec/60);
+  const s = totalSec%60;
+  return m + ':' + String(s).padStart(2,'0');
+}
+function esc(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+function log(room, text){
+  room.log = room.log || [];
+  room.log.push({t: now(), text});
+  if(room.log.length>40) room.log.shift();
+}
+function activePlayers(room){
+  return Object.entries(room.players).filter(([n,p])=>!p.out);
+}
+function myPlayer(){
+  if(!S.room || !S.room.players[S.username]) return null;
+  return S.room.players[S.username];
+}
+
+// ---------- GAME LOGIC (host-driven auto transitions) ----------
+async function hostTick(){
+  if(!S.room || !S.room.players[S.username] || !S.room.players[S.username].isHost) return;
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  let changed = false;
+  const t = now();
+
+  if(room.phase === 'hiding'){
+    const elapsed = t - room.phaseStartedAt;
+    if(elapsed >= room.settings.hideSec*1000){
+      room.phase = 'seeking';
+      room.phaseStartedAt = t;
+      log(room, 'Seeking has begun! Seekers are on the move.');
+      changed = true;
+    }
+  } else if(room.phase === 'seeking'){
+    // check grace expiries handled client-side visually, no state change needed
+    const elapsed = t - room.phaseStartedAt;
+    const active = activePlayers(room);
+    const hiders = active.filter(([n,p])=>p.role==='hider');
+    if(active.length<=1){
+      room.phase = 'ended';
+      room.winner = active.length===1 ? active[0][0] : null;
+      room.winnerType = 'lastStanding';
+      log(room, active.length===1 ? (active[0][0]+' is the last one standing!') : 'Game over.');
+      changed = true;
+    } else if(hiders.length===0){
+      room.phase = 'ended';
+      room.winnerType = 'seekers';
+      log(room, 'All hiders caught! Seekers win!');
+      changed = true;
+    } else if(elapsed >= room.settings.seekSec*1000){
+      room.phase = 'ended';
+      room.winnerType = hiders.length>0 ? 'hiders' : 'seekers';
+      log(room, 'Time is up! ' + (hiders.length>0 ? 'Hiders win!' : 'Seekers win!'));
+      changed = true;
+    }
+  }
+  if(changed) await saveRoom(room);
+}
+
+// ---------- ACTIONS ----------
+async function actCreateRoom(){
+  const name = document.getElementById('inp-username').value.trim();
+  if(!name){ S.error='Enter a username first.'; render(); return; }
+  S.busy = true; render();
+  const code = genCode();
+  const room = {
+    code,
+    createdAt: now(),
+    phase: 'lobby',
+    settings: {...DEFAULT_SETTINGS},
+    players: {
+      [name]: {isHost:true, role:'unassigned', out:false, joinedAt: now()}
+    },
+    log: [],
+    winner: null,
+    winnerType: null,
+    phaseStartedAt: null
+  };
+  await saveRoom(room);
+  S.username = name; S.code = code; S.room = room; S.screen = 'lobby'; S.error=''; S.busy=false;
+  await saveSession();
+  startPolling();
+  render();
+}
+
+async function actJoinRoom(){
+  const name = document.getElementById('inp-username').value.trim();
+  const code = document.getElementById('inp-code').value.trim().toUpperCase();
+  if(!name){ S.error='Enter a username first.'; render(); return; }
+  if(!code){ S.error='Enter a room code.'; render(); return; }
+  S.busy = true; render();
+  const room = await loadRoom(code);
+  if(!room){ S.error='No room found with that code.'; S.busy=false; render(); return; }
+  if(room.players[name]){
+    // rejoin
+  } else {
+    if(room.phase !== 'lobby'){
+      S.error = 'That game has already started.'; S.busy=false; render(); return;
+    }
+    room.players[name] = {isHost:false, role:'unassigned', out:false, joinedAt: now()};
+    await saveRoom(room);
+  }
+  S.username = name; S.code = code; S.room = room; S.screen = (room.phase==='lobby'?'lobby':room.phase); S.error=''; S.busy=false;
+  await saveSession();
+  startPolling();
+  render();
+}
+
+async function actUpdateSetting(key, val){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  room.settings[key] = val;
+  await saveRoom(room);
+  S.room = room;
+  render();
+}
+
+async function actStartGame(){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  const names = Object.keys(room.players);
+  if(names.length < 2){ S.error='Need at least 2 players to start.'; render(); return; }
+  const seekerCount = Math.min(room.settings.seekerCount, names.length-1);
+  const shuffled = [...names].sort(()=>Math.random()-0.5);
+  const seekers = new Set(shuffled.slice(0, seekerCount));
+  for(const n of names){
+    const p = room.players[n];
+    p.out = false;
+    if(seekers.has(n)){
+      p.role = 'seeker';
+      delete p.wallUsesLeft; delete p.wallShieldUntil; delete p.wallCooldownUntil;
+      delete p.calloutsLeft; delete p.graceUntil;
+    } else {
+      p.role = 'hider';
+      p.wallUsesLeft = room.settings.wallUses;
+      p.wallShieldUntil = 0;
+      p.wallCooldownUntil = 0;
+      p.calloutsLeft = room.settings.calloutUses;
+      p.graceUntil = 0;
+    }
+  }
+  room.phase = 'hiding';
+  room.phaseStartedAt = now();
+  room.winner = null; room.winnerType = null;
+  room.log = [];
+  log(room, 'A new round begins. Hiders, go hide!');
+  await saveRoom(room);
+  S.room = room; S.screen='hiding'; S.error='';
+  render();
+}
+
+async function actBecomeWall(){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  const p = room.players[S.username];
+  if(!p || p.role!=='hider' || p.out) return;
+  const t = now();
+  if(p.wallUsesLeft<=0 || t < p.wallCooldownUntil) return;
+  p.wallUsesLeft -= 1;
+  p.wallShieldUntil = t + room.settings.wallShieldSec*1000;
+  p.wallCooldownUntil = t + (room.settings.wallShieldSec + room.settings.wallCooldownSec)*1000;
+  log(room, S.username + ' became a wall!');
+  await saveRoom(room);
+  S.room = room;
+  render();
+}
+
+async function actCallOut(targetName){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  const me = room.players[S.username];
+  const target = room.players[targetName];
+  if(!me || !target) return;
+  if(me.role!=='hider' || me.out) return;
+  if(!me.calloutsLeft || me.calloutsLeft<=0) return;
+  if(target.role!=='seeker' || target.out) return;
+  const t = now();
+  me.calloutsLeft -= 1;
+  // swap
+  target.role = 'hider';
+  target.wallUsesLeft = room.settings.wallUses;
+  target.wallShieldUntil = 0;
+  target.wallCooldownUntil = 0;
+  target.calloutsLeft = room.settings.calloutUses;
+  target.graceUntil = t + room.settings.graceSec*1000;
+
+  me.role = 'seeker';
+  delete me.wallUsesLeft; delete me.wallShieldUntil; delete me.wallCooldownUntil;
+  delete me.calloutsLeft; delete me.graceUntil;
+
+  log(room, S.username + ' spotted ' + targetName + '! Roles swapped.');
+  await saveRoom(room);
+  S.room = room;
+  render();
+}
+
+async function actCatch(targetName){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  const target = room.players[targetName];
+  if(!target || target.role!=='hider' || target.out) return;
+  const t = now();
+  if(t < target.wallShieldUntil){
+    log(room, targetName + ' was shielded by the wall — catch failed!');
+    await saveRoom(room);
+    S.room = room; render();
+    return;
+  }
+  if(t < target.graceUntil){
+    log(room, targetName + ' was still in the grace period — catch failed!');
+    await saveRoom(room);
+    S.room = room; render();
+    return;
+  }
+  if(target.calloutsLeft && target.calloutsLeft>0){
+    target.calloutsLeft -= 1;
+    target.graceUntil = t + 5000;
+    log(room, targetName + ' wriggled free! (call-out used, ' + target.calloutsLeft + ' left)');
+  } else {
+    target.out = true;
+    log(room, targetName + ' was caught and is OUT!');
+  }
+  await saveRoom(room);
+  S.room = room;
+  render();
+}
+
+async function actPlayAgain(){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  room.phase = 'lobby';
+  room.winner = null; room.winnerType = null;
+  room.phaseStartedAt = null;
+  for(const n in room.players){
+    room.players[n].role = 'unassigned';
+    room.players[n].out = false;
+  }
+  log(room, 'Back to the lobby for another round.');
+  await saveRoom(room);
+  S.room = room; S.screen = 'lobby';
+  render();
+}
+
+async function actLeaveRoom(){
+  stopPolling();
+  await clearSession();
+  S = {screen:'landing', username:'', code:'', room:null, error:'', showRules:false, busy:false};
+  render();
+}
+
+// ---------- POLLING ----------
+let lastRoomSnapshot = '';
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(async ()=>{
+    if(!S.code) return;
+    const room = await loadRoom(S.code);
+    if(room){
+      const snapshot = JSON.stringify(room);
+      const changed = snapshot !== lastRoomSnapshot;
+      lastRoomSnapshot = snapshot;
+      S.room = room;
+      const phaseChanged = room.phase !== S.screen && ['lobby','hiding','seeking','ended'].includes(room.phase);
+      if(phaseChanged){
+        S.screen = room.phase;
+      }
+      await hostTick();
+      // Skip re-render if nothing changed while the user has a dropdown/input focused,
+      // so it isn't yanked out from under them mid-interaction.
+      const active = document.activeElement;
+      const isEditing = active && (active.tagName==='SELECT' || active.tagName==='INPUT');
+      if(changed || phaseChanged || !isEditing){
+        render();
+      }
+    }
+  }, 1500);
+  tickTimer = setInterval(()=>{
+    if(S.room && (S.screen==='hiding' || S.screen==='seeking')) render();
+  }, 500);
+}
+function stopPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  if(tickTimer) clearInterval(tickTimer);
+  pollTimer=null; tickTimer=null;
+}
+
+// ---------- RENDER ----------
+function render(){
+  const app = document.getElementById('app');
+  let html = '<div class="caution-stripe"></div>';
+  html += renderTopbar();
+  html += '<div class="content">';
+  switch(S.screen){
+    case 'landing': html += renderLanding(); break;
+    case 'lobby': html += renderLobby(); break;
+    case 'hiding': html += renderHiding(); break;
+    case 'seeking': html += renderSeeking(); break;
+    case 'ended': html += renderEnded(); break;
+  }
+  html += '</div>';
+  if(S.screen !== 'landing'){
+    html += '<div class="rules-fab" onclick="toggleRules()">?</div>';
+  }
+  if(S.showRules){
+    html += renderRulesModal();
+  }
+  app.innerHTML = html;
+}
+
+function renderTopbar(){
+  if(S.screen==='landing') return '<div class="topbar"></div>';
+  return '<div class="topbar">' +
+    '<div class="room-code">ROOM ' + esc(S.code) + '</div>' +
+    '<div style="font-size:13px;color:var(--text-dim);">' + esc(S.username) + '</div>' +
+  '</div>';
+}
+
+function renderLanding(){
+  return `
+    <div style="margin-top:30px;">
+      <div class="logo"><span class="hi">WALL</span> &amp; <span class="sk">SEEK</span></div>
+      <p class="subtle center" style="margin-top:8px;">Hide in plain sight. Freeze. Become the wall.</p>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>Your name</label>
+        <input type="text" id="inp-username" placeholder="e.g. Sam" maxlength="16">
+      </div>
+      <button class="btn btn-primary" onclick="actCreateRoom()" ${S.busy?'disabled':''}>Create a Room</button>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label>Room code</label>
+        <input type="text" id="inp-code" placeholder="e.g. ABCD" maxlength="4" style="text-transform:uppercase;">
+      </div>
+      <button class="btn btn-ghost" onclick="actJoinRoom()" ${S.busy?'disabled':''}>Join a Room</button>
+    </div>
+    ${S.error ? '<div class="error-text center">'+esc(S.error)+'</div>' : ''}
+  `;
+}
+
+function renderLobby(){
+  if(!S.room) return '<div class="loading-dot">Loading room…</div>';
+  const room = S.room;
+  const me = room.players[S.username];
+  const isHost = me && me.isHost;
+  const players = Object.entries(room.players);
+  let html = `<div class="card">
+    <h2>Lobby</h2>
+    <p class="subtle">Share the code <b style="color:var(--yellow)">${esc(room.code)}</b> with your friends. ${isHost ? "You're the host — set up the round below." : 'Waiting for the host to start...'}</p>
+  </div>`;
+
+  html += '<div class="card"><h3 style="margin-bottom:10px;">Players ('+players.length+')</h3>';
+  players.forEach(([n,p])=>{
+    html += `<div class="player-row">
+      <div class="player-name">${esc(n)} ${n===S.username?'<span class="you">YOU</span>':''}</div>
+      ${p.isHost ? '<span class="pill pill-host">Host</span>' : ''}
+    </div>`;
+  });
+  html += '</div>';
+
+  if(isHost){
+    const s = room.settings;
+    html += `<div class="card">
+      <h3 style="margin-bottom:12px;">Round Settings</h3>
+      <div class="field">
+        <label>Number of Seekers</label>
+        <select onchange="actUpdateSetting('seekerCount', parseInt(this.value))">
+          ${[1,2,3,4].map(n=>`<option value="${n}" ${s.seekerCount===n?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Hiding time (seconds)</label>
+        <input type="number" value="${s.hideSec}" onchange="actUpdateSetting('hideSec', parseInt(this.value)||30)">
+      </div>
+      <div class="field">
+        <label>Seeking time limit (seconds)</label>
+        <input type="number" value="${s.seekSec}" onchange="actUpdateSetting('seekSec', parseInt(this.value)||600)">
+      </div>
+      <div class="field">
+        <label>Become-Wall uses per hider</label>
+        <input type="number" value="${s.wallUses}" onchange="actUpdateSetting('wallUses', parseInt(this.value)||0)">
+      </div>
+      <div class="field">
+        <label>Wall shield duration (seconds)</label>
+        <input type="number" value="${s.wallShieldSec}" onchange="actUpdateSetting('wallShieldSec', parseInt(this.value)||5)">
+      </div>
+      <div class="field">
+        <label>Call-outs per hider (spot a seeker to swap)</label>
+        <input type="number" value="${s.calloutUses}" onchange="actUpdateSetting('calloutUses', parseInt(this.value)||0)">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Grace period after a swap (seconds)</label>
+        <input type="number" value="${s.graceSec}" onchange="actUpdateSetting('graceSec', parseInt(this.value)||10)">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="actStartGame()">Start Round</button>`;
+  }
+  html += '<button class="btn btn-ghost" onclick="actLeaveRoom()">Leave Room</button>';
+  if(S.error) html += '<div class="error-text center">'+esc(S.error)+'</div>';
+  return html;
+}
+
+function renderHiding(){
+  if(!S.room) return '<div class="loading-dot">Loading…</div>';
+  const room = S.room;
+  const me = room.players[S.username];
+  const remaining = room.settings.hideSec*1000 - (now()-room.phaseStartedAt);
+  const isHider = me && me.role==='hider';
+  let html = '';
+  if(isHider){
+    html += `<div class="status-banner brick-bg">
+      <div style="font-family:'Anton',sans-serif;font-size:20px;">GO HIDE!</div>
+      <div class="timer" style="margin-top:6px;">${fmtTime(remaining)}</div>
+    </div>
+    <p class="subtle center">Find your spot. Once seeking starts you can tap <b>Become Wall</b> to freeze and dodge a catch — you get ${room.settings.wallUses} uses.</p>`;
+  } else {
+    html += `<div class="status-banner" style="background:var(--surface-2);">
+      <div style="font-family:'Anton',sans-serif;font-size:20px;color:var(--seeker);">NO PEEKING</div>
+      <div class="timer" style="margin-top:6px;">${fmtTime(remaining)}</div>
+      <p class="subtle" style="margin-top:8px;">Hiders are hiding. Seeking starts automatically.</p>
+    </div>`;
+  }
+  html += renderPlayerList(room, false);
+  return html;
+}
+
+function renderSeeking(){
+  if(!S.room) return '<div class="loading-dot">Loading…</div>';
+  const room = S.room;
+  const me = room.players[S.username];
+  const t = now();
+  const remaining = room.settings.seekSec*1000 - (t-room.phaseStartedAt);
+
+  let html = `<div class="timer-label">Time Left</div><div class="timer center">${fmtTime(remaining)}</div>`;
+
+  if(me && me.out){
+    html += `<div class="status-banner" style="background:var(--surface-2);margin-top:12px;">
+      <div style="color:var(--concrete);font-family:'Anton',sans-serif;">YOU'RE OUT</div>
+      <p class="subtle" style="margin-top:6px;">Watch how the round plays out below.</p>
+    </div>`;
+  } else if(me && me.role==='hider'){
+    const shielded = t < me.wallShieldUntil;
+    const cooling = !shielded && t < me.wallCooldownUntil;
+    const inGrace = t < me.graceUntil;
+    html += `<div class="${shielded?'brick-bg':'card'}" style="margin-top:12px;">
+      <div class="center" style="font-family:'Anton',sans-serif;font-size:18px;${shielded?'':'color:var(--hider);'}">
+        ${shielded ? 'YOU ARE THE WALL' : (inGrace ? 'GRACE PERIOD — GO HIDE' : 'YOU ARE HIDING')}
+      </div>
+      ${shielded ? '<div class="center" style="margin-top:4px;">Immune for '+fmtTime(me.wallShieldUntil-t)+'</div>' : ''}
+      ${inGrace && !shielded ? '<div class="center subtle" style="margin-top:4px;">Immune for '+fmtTime(me.graceUntil-t)+'</div>' : ''}
+      <div style="margin-top:14px;">
+        <button class="btn btn-hider" onclick="actBecomeWall()" ${(me.wallUsesLeft<=0 || cooling || shielded)?'disabled':''}>
+          ${shielded ? 'Shield Active' : (cooling ? 'Cooling Down ('+fmtTime(me.wallCooldownUntil-t)+')' : 'Become Wall ('+me.wallUsesLeft+' left)')}
+        </button>
+      </div>
+    </div>`;
+
+    const seekers = activePlayers(room).filter(([n,p])=>p.role==='seeker');
+    html += `<div class="card">
+      <h3 style="margin-bottom:8px;">Spot a Seeker?</h3>
+      <p class="subtle" style="margin-bottom:10px;">If you see one before they see you, call them out — you'll swap roles. Call-outs left: <b style="color:var(--hider)">${me.calloutsLeft}</b></p>`;
+    if(seekers.length===0){
+      html += '<p class="subtle">No active seekers right now.</p>';
+    } else {
+      seekers.forEach(([n,p])=>{
+        html += `<div class="player-row">
+          <div class="player-name">${esc(n)}</div>
+          <button class="btn btn-seeker" style="width:auto;padding:8px 14px;font-size:13px;" onclick="actCallOut('${esc(n)}')" ${me.calloutsLeft<=0?'disabled':''}>Call Out</button>
+        </div>`;
+      });
+    }
+    html += '</div>';
+  } else if(me && me.role==='seeker'){
+    html += `<div class="card" style="margin-top:12px;">
+      <div class="center" style="font-family:'Anton',sans-serif;font-size:18px;color:var(--seeker);">YOU ARE SEEKING</div>
+      <p class="subtle center" style="margin-top:6px;">Find a hider in real life, then tap their name below to catch them. Watch out — hiders can call YOU out if they spot you first.</p>
+    </div>`;
+    const hiders = activePlayers(room).filter(([n,p])=>p.role==='hider');
+    html += `<div class="card"><h3 style="margin-bottom:8px;">Caught someone?</h3>`;
+    if(hiders.length===0){
+      html += '<p class="subtle">No hiders left active.</p>';
+    } else {
+      hiders.forEach(([n,p])=>{
+        const shielded = t < p.wallShieldUntil;
+        const inGrace = t < p.graceUntil;
+        html += `<div class="player-row">
+          <div class="player-name">${esc(n)} ${shielded?'<span class="pill pill-hider">Wall</span>':(inGrace?'<span class="pill pill-hider">Grace</span>':'')}</div>
+          <button class="btn btn-seeker" style="width:auto;padding:8px 14px;font-size:13px;" onclick="actCatch('${esc(n)}')">Tag / Catch</button>
+        </div>`;
+      });
+    }
+    html += '</div>';
+  }
+
+  html += renderPlayerList(room, true);
+  html += renderLog(room);
+  return html;
+}
+
+function renderEnded(){
+  if(!S.room) return '<div class="loading-dot">Loading…</div>';
+  const room = S.room;
+  const me = room.players[S.username];
+  const isHost = me && me.isHost;
+  let headline = 'Round Over';
+  let sub = '';
+  if(room.winnerType==='lastStanding' && room.winner){
+    headline = room.winner + ' Wins!';
+    sub = 'Last one standing.';
+  } else if(room.winnerType==='seekers'){
+    headline = 'Seekers Win!';
+    sub = 'Every hider was caught.';
+  } else if(room.winnerType==='hiders'){
+    headline = 'Hiders Win!';
+    sub = 'Time ran out and hiders were still free.';
+  }
+  let html = `<div class="status-banner" style="background:var(--surface-2);">
+    <div style="font-family:'Anton',sans-serif;font-size:24px;color:var(--yellow);">${esc(headline)}</div>
+    <p class="subtle" style="margin-top:6px;">${esc(sub)}</p>
+  </div>`;
+  html += renderPlayerList(room, true);
+  html += renderLog(room);
+  if(isHost){
+    html += '<button class="btn btn-primary" onclick="actPlayAgain()">Play Again</button>';
+  } else {
+    html += '<p class="subtle center">Waiting for the host to start a new round…</p>';
+  }
+  html += '<button class="btn btn-ghost" onclick="actLeaveRoom()">Leave Room</button>';
+  return html;
+}
+
+function renderPlayerList(room, showStatus){
+  const t = now();
+  let html = '<div class="card"><h3 style="margin-bottom:8px;">Players</h3>';
+  Object.entries(room.players).forEach(([n,p])=>{
+    let pill = '';
+    if(p.out) pill = '<span class="pill pill-out">Out</span>';
+    else if(p.role==='hider') pill = '<span class="pill pill-hider">Hider</span>';
+    else if(p.role==='seeker') pill = '<span class="pill pill-seeker">Seeker</span>';
+    html += `<div class="player-row">
+      <div class="player-name">${esc(n)} ${n===S.username?'<span class="you">YOU</span>':''}</div>
+      <div>${pill}</div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderLog(room){
+  if(!room.log || room.log.length===0) return '';
+  let html = '<div class="card"><h3 style="margin-bottom:8px;">Live Feed</h3><div class="log">';
+  [...room.log].reverse().slice(0,15).forEach(item=>{
+    html += `<div class="log-item">${esc(item.text)}</div>`;
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function renderRulesModal(){
+  return `<div class="modal-overlay" onclick="if(event.target===this) toggleRules()">
+    <div class="modal">
+      <button class="close-modal" onclick="toggleRules()">✕</button>
+      <h2>How to Play</h2>
+      <div class="rule-block">
+        <div class="rule-title"><span class="num">1</span>Roles</div>
+        <p class="subtle">The host picks how many Seekers there are — everyone else is a Hider. Hiders go hide somewhere in real life while Seekers wait.</p>
+      </div>
+      <div class="rule-block">
+        <div class="rule-title"><span class="num">2</span>Become Wall</div>
+        <p class="subtle">Each Hider gets a limited number of "Become Wall" taps. Tapping it shields you for a short window — if a Seeker tries to catch you during that time, the catch fails. There's a cooldown before you can use it again.</p>
+      </div>
+      <div class="rule-block">
+        <div class="rule-title"><span class="num">3</span>Catching</div>
+        <p class="subtle">When a Seeker physically finds a Hider, they tap that Hider's name to catch them. If the Hider still has a call-out in reserve, they wriggle free instead of being eliminated. Once out of call-outs, a catch means they're OUT.</p>
+      </div>
+      <div class="rule-block">
+        <div class="rule-title"><span class="num">4</span>Turning the Tables</div>
+        <p class="subtle">If a Hider spots a Seeker first, they can tap "Call Out" on that Seeker's name. Roles instantly swap: the Seeker becomes a Hider (with a short grace period to go hide), and the Hider becomes a Seeker.</p>
+      </div>
+      <div class="rule-block">
+        <div class="rule-title"><span class="num">5</span>Winning</div>
+        <p class="subtle">The round ends when only one player remains active, when every Hider has been caught (Seekers win), or when time runs out (Hiders win if any are still free).</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleRules(){
+  S.showRules = !S.showRules;
+  render();
+}
+
+// ---------- INIT ----------
+async function init(){
+  try{
+    const sess = readSession();
+    if(sess && sess.username && sess.code){
+      const room = await loadRoom(sess.code);
+      if(room && room.players[sess.username]){
+        S.username = sess.username;
+        S.code = sess.code;
+        S.room = room;
+        S.screen = room.phase || 'lobby';
+        startPolling();
+      }
+    }
+  }catch(e){}
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
