@@ -3,1055 +3,610 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
-<title>Wall &amp; Seek</title>
+<title>Wall &amp; Seek 3D</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root{
-    --bg:#15171a;
-    --surface:#1e2124;
-    --surface-2:#262a2e;
-    --surface-3:#2f3438;
-    --concrete:#9ba1a6;
-    --yellow:#ffc93c;
-    --seeker:#ff5d5d;
-    --hider:#3ddc97;
-    --brick:#b0492e;
-    --brick-dark:#8a381f;
-    --text:#f3f1ea;
-    --text-dim:#9ba1a6;
-    --danger:#ff5d5d;
-    --radius:14px;
+    --bg:#15171a; --surface:#1e2124; --surface-2:#262a2e; --surface-3:#2f3438;
+    --yellow:#ffc93c; --seeker:#ff5d5d; --hider:#3ddc97; --brick:#b0492e;
+    --text:#f3f1ea; --text-dim:#9ba1a6; --radius:14px;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:var(--bg);
-    color:var(--text);
-    font-family:'Inter',sans-serif;
-    min-height:100vh;
-    -webkit-tap-highlight-color:transparent;
+  html,body{margin:0;padding:0;overflow:hidden;background:var(--bg);}
+  body{font-family:'Inter',sans-serif;color:var(--text);-webkit-tap-highlight-color:transparent;}
+  h1,h2,h3{font-family:'Anton',sans-serif;font-weight:400;letter-spacing:0.5px;margin:0;}
+  .logo{font-family:'Bungee',cursive;font-size:clamp(28px,8vw,40px);letter-spacing:1px;text-align:center;}
+  .logo .hi{color:var(--hider);} .logo .sk{color:var(--seeker);}
+  #ui-overlay{
+    position:fixed;inset:0;z-index:10;pointer-events:none;
   }
-  #app{
-    max-width:520px;
-    margin:0 auto;
-    min-height:100vh;
-    display:flex;
-    flex-direction:column;
-    position:relative;
-    padding-bottom:40px;
-  }
-  h1,h2,h3{
-    font-family:'Anton',sans-serif;
-    font-weight:400;
-    letter-spacing:0.5px;
-    margin:0;
-  }
-  .logo{
-    font-family:'Bungee',cursive;
-    font-size:clamp(28px,8vw,40px);
-    letter-spacing:1px;
-    line-height:1.1;
-    text-align:center;
-  }
-  .logo .hi{color:var(--hider);}
-  .logo .sk{color:var(--seeker);}
-  .caution-stripe{
-    height:14px;
-    width:100%;
-    background:repeating-linear-gradient(45deg, var(--yellow) 0 18px, var(--bg) 18px 36px);
-    flex-shrink:0;
-  }
-  .topbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:16px 20px 8px;
-  }
-  .topbar .room-code{
-    font-family:'Anton',sans-serif;
-    letter-spacing:2px;
-    color:var(--yellow);
-    font-size:14px;
-    background:var(--surface-2);
-    padding:6px 10px;
-    border-radius:8px;
-  }
-  .content{
-    flex:1;
-    padding:16px 20px 24px;
-    display:flex;
-    flex-direction:column;
-    gap:16px;
+  #ui-overlay.clickable > *{pointer-events:auto;}
+  #lobby-screen{
+    position:fixed;inset:0;overflow-y:auto;background:var(--bg);
+    display:flex;flex-direction:column;align-items:center;padding:30px 20px;z-index:20;
   }
   .card{
-    background:var(--surface);
-    border-radius:var(--radius);
-    padding:18px;
-    border:1px solid var(--surface-3);
+    background:var(--surface);border-radius:var(--radius);padding:18px;
+    border:1px solid var(--surface-3);width:100%;max-width:400px;margin-bottom:14px;
   }
   .btn{
-    font-family:'Anton',sans-serif;
-    letter-spacing:0.5px;
-    font-size:16px;
-    padding:14px 18px;
-    border-radius:10px;
-    border:none;
-    cursor:pointer;
-    text-align:center;
+    font-family:'Anton',sans-serif;letter-spacing:0.5px;font-size:16px;padding:14px 18px;
+    border-radius:10px;border:none;cursor:pointer;text-align:center;width:100%;
     transition:transform .08s ease, filter .15s ease;
-    width:100%;
   }
   .btn:active{transform:scale(0.97);}
   .btn:disabled{opacity:0.35;cursor:not-allowed;}
   .btn-primary{background:var(--yellow);color:#1a1a1a;}
-  .btn-primary:hover:not(:disabled){filter:brightness(1.08);}
   .btn-hider{background:var(--hider);color:#0e2119;}
   .btn-seeker{background:var(--seeker);color:#2a0a0a;}
   .btn-ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--surface-3);}
-  .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
-  .btn-row{display:flex;gap:10px;}
-  input[type=text], input[type=number]{
-    width:100%;
-    background:var(--surface-2);
-    border:1px solid var(--surface-3);
-    color:var(--text);
-    padding:13px 14px;
-    border-radius:10px;
-    font-family:'Inter',sans-serif;
-    font-size:16px;
+  input[type=text],input[type=number]{
+    width:100%;background:var(--surface-2);border:1px solid var(--surface-3);color:var(--text);
+    padding:13px 14px;border-radius:10px;font-family:'Inter',sans-serif;font-size:16px;
   }
-  input:focus{outline:2px solid var(--yellow);}
-  label{
-    font-size:12px;
-    text-transform:uppercase;
-    letter-spacing:1px;
-    color:var(--text-dim);
-    font-weight:600;
-    display:block;
-    margin-bottom:6px;
-  }
+  select{width:100%;background:var(--surface-2);border:1px solid var(--surface-3);color:var(--text);
+    padding:13px 14px;border-radius:10px;font-family:'Inter',sans-serif;font-size:16px;}
+  label{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);font-weight:600;display:block;margin-bottom:6px;}
   .field{margin-bottom:14px;}
   .subtle{color:var(--text-dim);font-size:14px;line-height:1.5;}
-  .pill{
-    display:inline-block;
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:0.8px;
-    font-weight:700;
-    padding:4px 9px;
-    border-radius:999px;
-  }
+  .pill{display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;font-weight:700;padding:4px 9px;border-radius:999px;}
   .pill-hider{background:rgba(61,220,151,0.15);color:var(--hider);}
   .pill-seeker{background:rgba(255,93,93,0.15);color:var(--seeker);}
-  .pill-out{background:rgba(155,161,166,0.15);color:var(--concrete);}
+  .pill-out{background:rgba(155,161,166,0.15);color:var(--text-dim);}
   .pill-host{background:rgba(255,201,60,0.15);color:var(--yellow);}
-  .player-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:10px 0;
-    border-bottom:1px solid var(--surface-3);
-    gap:10px;
-  }
+  .player-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--surface-3);}
   .player-row:last-child{border-bottom:none;}
-  .player-name{font-weight:600;font-size:15px;}
-  .player-name .you{color:var(--yellow);font-size:12px;margin-left:6px;font-weight:700;}
-  .timer{
-    font-family:'Anton',sans-serif;
-    font-size:52px;
-    text-align:center;
-    letter-spacing:2px;
-    line-height:1;
+  .error-text{color:var(--seeker);font-size:13px;text-align:center;}
+
+  #hud-top{
+    position:fixed;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;
+    align-items:flex-start;z-index:15;
   }
-  .timer-label{
-    text-align:center;
-    text-transform:uppercase;
-    letter-spacing:2px;
-    font-size:12px;
-    color:var(--text-dim);
-    margin-top:6px;
-    font-weight:700;
+  #hud-room{background:rgba(30,33,36,0.85);backdrop-filter:blur(4px);padding:8px 12px;border-radius:10px;font-family:'Anton',sans-serif;color:var(--yellow);font-size:13px;letter-spacing:1px;}
+  #hud-status{background:rgba(30,33,36,0.85);backdrop-filter:blur(4px);padding:10px 16px;border-radius:10px;text-align:center;font-family:'Anton',sans-serif;font-size:15px;}
+  #hud-timer{font-family:'Anton',sans-serif;font-size:22px;text-align:center;}
+  #hud-log{
+    position:fixed;top:64px;left:14px;max-width:260px;background:rgba(30,33,36,0.7);
+    border-radius:10px;padding:8px 10px;font-size:12px;color:var(--text-dim);z-index:15;
+    max-height:100px;overflow-y:auto;
   }
-  .brick-bg{
-    background-color:var(--brick);
-    background-image:
-      linear-gradient(335deg, rgba(0,0,0,.28) 23px, transparent 23px),
-      linear-gradient(155deg, rgba(0,0,0,.28) 23px, transparent 23px),
-      linear-gradient(335deg, rgba(0,0,0,.28) 23px, transparent 23px),
-      linear-gradient(155deg, rgba(0,0,0,.28) 23px, transparent 23px);
-    background-size:58px 58px;
-    background-position:0 0, 0 0, 29px 29px, 29px 29px;
-    color:#fff;
-    border-radius:var(--radius);
-    padding:22px;
-    text-align:center;
+  #hud-bottom{
+    position:fixed;bottom:0;left:0;right:0;padding:16px;display:flex;justify-content:space-between;
+    align-items:flex-end;z-index:15;
   }
-  .status-banner{
-    text-align:center;
-    padding:22px;
-    border-radius:var(--radius);
+  #joystick-zone{width:130px;height:130px;position:relative;}
+  #joystick-base{
+    position:absolute;inset:0;border-radius:50%;background:rgba(255,255,255,0.08);
+    border:2px solid rgba(255,255,255,0.15);
   }
-  .log{
-    max-height:150px;
-    overflow-y:auto;
-    display:flex;
-    flex-direction:column-reverse;
-    gap:6px;
-    font-size:13px;
-    color:var(--text-dim);
+  #joystick-nub{
+    position:absolute;width:56px;height:56px;border-radius:50%;background:rgba(255,201,60,0.85);
+    top:37px;left:37px;transition:transform 0.05s linear;
   }
-  .log-item span{color:var(--text);font-weight:600;}
-  .rules-fab{
-    position:fixed;
-    bottom:18px;
-    right:calc(50% - 260px + 18px);
-    background:var(--surface-2);
-    border:1px solid var(--surface-3);
-    color:var(--text);
-    width:46px;height:46px;
-    border-radius:50%;
-    font-family:'Anton',sans-serif;
-    font-size:18px;
-    display:flex;align-items:center;justify-content:center;
-    cursor:pointer;
-    z-index:50;
-    box-shadow:0 4px 14px rgba(0,0,0,0.4);
+  #action-buttons{display:flex;flex-direction:column;gap:10px;align-items:flex-end;}
+  .action-btn{
+    font-family:'Anton',sans-serif;font-size:14px;padding:12px 18px;border-radius:10px;border:none;
+    cursor:pointer;white-space:nowrap;
   }
-  @media (max-width:560px){
-    .rules-fab{right:18px;}
+  #wall-btn{background:var(--hider);color:#0e2119;}
+  #wall-btn:disabled{opacity:0.3;}
+  #catch-btn{background:var(--seeker);color:#2a0a0a;display:none;}
+  #callout-btn{background:var(--yellow);color:#1a1a1a;display:none;}
+  #rules-fab{
+    position:fixed;bottom:150px;right:16px;background:rgba(38,42,46,0.9);border:1px solid var(--surface-3);
+    color:var(--text);width:42px;height:42px;border-radius:50%;font-family:'Anton',sans-serif;font-size:16px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:15;
   }
-  .modal-overlay{
-    position:fixed;inset:0;
-    background:rgba(0,0,0,0.65);
-    display:flex;align-items:flex-end;justify-content:center;
-    z-index:100;
+  #end-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:25;
   }
-  .modal{
-    background:var(--surface);
-    border-top-left-radius:20px;
-    border-top-right-radius:20px;
-    max-width:520px;
-    width:100%;
-    max-height:82vh;
-    overflow-y:auto;
-    padding:22px 20px 30px;
-    border-top:3px solid var(--yellow);
-  }
-  .modal h2{margin-bottom:14px;}
-  .rule-block{margin-bottom:16px;}
-  .rule-block .num{
-    display:inline-flex;
-    align-items:center;justify-content:center;
-    width:24px;height:24px;
-    background:var(--yellow);
-    color:#1a1a1a;
-    font-family:'Anton',sans-serif;
-    border-radius:50%;
-    font-size:13px;
-    margin-right:8px;
-  }
-  .rule-title{font-weight:800;font-size:15px;margin-bottom:4px;}
-  .close-modal{
-    position:sticky;top:0;
-    float:right;
-    background:var(--surface-2);
-    border:none;color:var(--text);
-    width:32px;height:32px;border-radius:50%;
-    font-size:16px;cursor:pointer;
-  }
-  .center{text-align:center;}
-  .stat-grid{display:flex;gap:10px;}
-  .stat-box{
-    flex:1;
-    background:var(--surface-2);
-    border-radius:10px;
-    padding:12px 8px;
-    text-align:center;
-  }
-  .stat-box .n{font-family:'Anton',sans-serif;font-size:22px;}
-  .stat-box .l{font-size:10px;text-transform:uppercase;color:var(--text-dim);letter-spacing:0.8px;margin-top:2px;}
-  .error-text{color:var(--danger);font-size:13px;margin-top:-8px;}
-  .divider{height:1px;background:var(--surface-3);margin:4px 0;}
-  select{
-    width:100%;
-    background:var(--surface-2);
-    border:1px solid var(--surface-3);
-    color:var(--text);
-    padding:13px 14px;
-    border-radius:10px;
-    font-family:'Inter',sans-serif;
-    font-size:16px;
-  }
-  .loading-dot{
-    text-align:center;color:var(--text-dim);font-size:13px;padding:20px 0;
-  }
+  #end-card{background:var(--surface);border-radius:var(--radius);padding:26px;text-align:center;max-width:360px;width:90%;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:flex-end;justify-content:center;z-index:30;}
+  .modal{background:var(--surface);border-top-left-radius:20px;border-top-right-radius:20px;max-width:480px;width:100%;max-height:80vh;overflow-y:auto;padding:20px;border-top:3px solid var(--yellow);}
+  .rule-title{font-weight:800;font-size:14px;margin-bottom:3px;}
+  .rule-block{margin-bottom:14px;}
+  .close-modal{float:right;background:var(--surface-2);border:none;color:var(--text);width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;}
+  .hidden{display:none !important;}
 </style>
 </head>
 <body>
-<div id="app"></div>
 
-<script>
-// ---------- CONSTANTS ----------
-const DEFAULT_SETTINGS = {
-  seekerCount: 1,
-  wallUses: 3,
-  wallShieldSec: 8,
-  wallCooldownSec: 15,
-  calloutUses: 2,
-  seekSec: 600,
-  graceSec: 15,
-  mapOptions: ['Living Room', 'Backyard', 'Park', 'Whole House', 'School']
-};
+<canvas id="scene" style="position:fixed;inset:0;z-index:1;"></canvas>
 
-// ---------- STATE ----------
-let S = {
-  screen: 'landing', // landing, lobby, hiding, seeking, ended
-  username: '',
-  code: '',
-  room: null,
-  error: '',
-  showRules: false,
-  busy: false
-};
-
-let pollTimer = null;
-let tickTimer = null;
-
-// ---------- STORAGE HELPERS (backed by our own Express API on Render) ----------
-async function loadRoom(code){
-  try{
-    const res = await fetch('/api/room/' + encodeURIComponent(code));
-    if(!res.ok) return null;
-    return await res.json();
-  }catch(e){
-    return null;
-  }
-}
-async function saveRoom(room){
-  room.updatedAt = Date.now();
-  try{
-    await fetch('/api/room/' + encodeURIComponent(room.code), {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(room)
-    });
-  }catch(e){}
-}
-async function saveSession(){
-  try{
-    localStorage.setItem('wallandseek-session', JSON.stringify({username:S.username, code:S.code}));
-  }catch(e){}
-}
-async function clearSession(){
-  try{
-    localStorage.removeItem('wallandseek-session');
-  }catch(e){}
-}
-function readSession(){
-  try{
-    const raw = localStorage.getItem('wallandseek-session');
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){
-    return null;
-  }
-}
-
-// ---------- UTIL ----------
-function genCode(){
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  let c='';
-  for(let i=0;i<4;i++) c += letters[Math.floor(Math.random()*letters.length)];
-  return c;
-}
-function now(){ return Date.now(); }
-function fmtTime(ms){
-  if(ms<0) ms=0;
-  const totalSec = Math.ceil(ms/1000);
-  const m = Math.floor(totalSec/60);
-  const s = totalSec%60;
-  return m + ':' + String(s).padStart(2,'0');
-}
-function esc(str){
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
-function log(room, text){
-  room.log = room.log || [];
-  room.log.push({t: now(), text});
-  if(room.log.length>40) room.log.shift();
-}
-function activePlayers(room){
-  return Object.entries(room.players).filter(([n,p])=>!p.out);
-}
-function myPlayer(){
-  if(!S.room || !S.room.players[S.username]) return null;
-  return S.room.players[S.username];
-}
-function tallyMap(room){
-  const options = room.settings.mapOptions || [];
-  const counts = {};
-  options.forEach(m=>counts[m]=0);
-  Object.values(room.votes || {}).forEach(v=>{
-    if(counts[v]!==undefined) counts[v]++;
-  });
-  let bestCount = -1, tied = [];
-  options.forEach(m=>{
-    if(counts[m] > bestCount){ bestCount = counts[m]; tied = [m]; }
-    else if(counts[m] === bestCount){ tied.push(m); }
-  });
-  if(tied.length===0) return options[0] || null;
-  return tied[Math.floor(Math.random()*tied.length)];
-}
-
-// ---------- GAME LOGIC (host-driven auto transitions) ----------
-async function hostTick(){
-  if(!S.room || !S.room.players[S.username] || !S.room.players[S.username].isHost) return;
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  let changed = false;
-  const t = now();
-
-  if(room.phase === 'seeking'){
-    // check grace expiries handled client-side visually, no state change needed
-    const elapsed = t - room.phaseStartedAt;
-    const active = activePlayers(room);
-    const hiders = active.filter(([n,p])=>p.role==='hider');
-    if(active.length<=1){
-      room.phase = 'ended';
-      room.winner = active.length===1 ? active[0][0] : null;
-      room.winnerType = 'lastStanding';
-      log(room, active.length===1 ? (active[0][0]+' is the last one standing!') : 'Game over.');
-      changed = true;
-    } else if(hiders.length===0){
-      room.phase = 'ended';
-      room.winnerType = 'seekers';
-      log(room, 'All hiders caught! Seekers win!');
-      changed = true;
-    } else if(elapsed >= room.settings.seekSec*1000){
-      room.phase = 'ended';
-      room.winnerType = hiders.length>0 ? 'hiders' : 'seekers';
-      log(room, 'Time is up! ' + (hiders.length>0 ? 'Hiders win!' : 'Seekers win!'));
-      changed = true;
-    }
-  }
-  if(changed) await saveRoom(room);
-}
-
-// ---------- ACTIONS ----------
-async function actCreateRoom(){
-  const name = document.getElementById('inp-username').value.trim();
-  if(!name){ S.error='Enter a username first.'; render(); return; }
-  S.busy = true; render();
-  const code = genCode();
-  const room = {
-    code,
-    createdAt: now(),
-    phase: 'lobby',
-    settings: {...DEFAULT_SETTINGS},
-    players: {
-      [name]: {isHost:true, role:'unassigned', out:false, joinedAt: now()}
-    },
-    votes: {},
-    selectedMap: null,
-    log: [],
-    winner: null,
-    winnerType: null,
-    phaseStartedAt: null
-  };
-  await saveRoom(room);
-  S.username = name; S.code = code; S.room = room; S.screen = 'lobby'; S.error=''; S.busy=false;
-  await saveSession();
-  startPolling();
-  render();
-}
-
-async function actJoinRoom(){
-  const name = document.getElementById('inp-username').value.trim();
-  const code = document.getElementById('inp-code').value.trim().toUpperCase();
-  if(!name){ S.error='Enter a username first.'; render(); return; }
-  if(!code){ S.error='Enter a room code.'; render(); return; }
-  S.busy = true; render();
-  const room = await loadRoom(code);
-  if(!room){ S.error='No room found with that code.'; S.busy=false; render(); return; }
-  if(room.players[name]){
-    // rejoin
-  } else {
-    if(room.phase !== 'lobby'){
-      S.error = 'That game has already started.'; S.busy=false; render(); return;
-    }
-    room.players[name] = {isHost:false, role:'unassigned', out:false, joinedAt: now()};
-    await saveRoom(room);
-  }
-  S.username = name; S.code = code; S.room = room; S.screen = (room.phase==='lobby'?'lobby':room.phase); S.error=''; S.busy=false;
-  await saveSession();
-  startPolling();
-  render();
-}
-
-async function actUpdateSetting(key, val){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  room.settings[key] = val;
-  await saveRoom(room);
-  S.room = room;
-  render();
-}
-
-async function actVoteMap(mapName){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  room.votes = room.votes || {};
-  room.votes[S.username] = mapName;
-  await saveRoom(room);
-  S.room = room;
-  render();
-}
-
-async function actStartGame(){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  const names = Object.keys(room.players);
-  if(names.length < 2){ S.error='Need at least 2 players to start.'; render(); return; }
-  const seekerCount = Math.min(room.settings.seekerCount, names.length-1);
-  const shuffled = [...names].sort(()=>Math.random()-0.5);
-  const seekers = new Set(shuffled.slice(0, seekerCount));
-  for(const n of names){
-    const p = room.players[n];
-    p.out = false;
-    if(seekers.has(n)){
-      p.role = 'seeker';
-      delete p.wallUsesLeft; delete p.wallShieldUntil; delete p.wallCooldownUntil;
-      delete p.calloutsLeft; delete p.graceUntil;
-    } else {
-      p.role = 'hider';
-      p.wallUsesLeft = room.settings.wallUses;
-      p.wallShieldUntil = 0;
-      p.wallCooldownUntil = 0;
-      p.calloutsLeft = room.settings.calloutUses;
-      p.graceUntil = 0;
-    }
-  }
-  room.selectedMap = tallyMap(room);
-  room.phase = 'hiding';
-  room.phaseStartedAt = now();
-  room.winner = null; room.winnerType = null;
-  room.log = [];
-  log(room, 'Playing on: ' + room.selectedMap + '. Hiders, go hide!');
-  await saveRoom(room);
-  S.room = room; S.screen='hiding'; S.error='';
-  render();
-}
-
-async function actStartSeeking(){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  const me = room.players[S.username];
-  if(!me || !me.isHost || room.phase!=='hiding') return;
-  room.phase = 'seeking';
-  room.phaseStartedAt = now();
-  log(room, 'Seeking has begun! Seekers are on the move.');
-  await saveRoom(room);
-  S.room = room; S.screen='seeking';
-  render();
-}
-
-async function actBecomeWall(){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  const p = room.players[S.username];
-  if(!p || p.role!=='hider' || p.out) return;
-  const t = now();
-  if(p.wallUsesLeft<=0 || t < p.wallCooldownUntil) return;
-  p.wallUsesLeft -= 1;
-  p.wallShieldUntil = t + room.settings.wallShieldSec*1000;
-  p.wallCooldownUntil = t + (room.settings.wallShieldSec + room.settings.wallCooldownSec)*1000;
-  log(room, S.username + ' became a wall!');
-  await saveRoom(room);
-  S.room = room;
-  render();
-}
-
-async function actCallOut(targetName){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  const me = room.players[S.username];
-  const target = room.players[targetName];
-  if(!me || !target) return;
-  if(me.role!=='hider' || me.out) return;
-  if(!me.calloutsLeft || me.calloutsLeft<=0) return;
-  if(target.role!=='seeker' || target.out) return;
-  const t = now();
-  me.calloutsLeft -= 1;
-  // swap
-  target.role = 'hider';
-  target.wallUsesLeft = room.settings.wallUses;
-  target.wallShieldUntil = 0;
-  target.wallCooldownUntil = 0;
-  target.calloutsLeft = room.settings.calloutUses;
-  target.graceUntil = t + room.settings.graceSec*1000;
-
-  me.role = 'seeker';
-  delete me.wallUsesLeft; delete me.wallShieldUntil; delete me.wallCooldownUntil;
-  delete me.calloutsLeft; delete me.graceUntil;
-
-  log(room, S.username + ' spotted ' + targetName + '! Roles swapped.');
-  await saveRoom(room);
-  S.room = room;
-  render();
-}
-
-async function actCatch(targetName){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  const target = room.players[targetName];
-  if(!target || target.role!=='hider' || target.out) return;
-  const t = now();
-  if(t < target.wallShieldUntil){
-    log(room, targetName + ' was shielded by the wall — catch failed!');
-    await saveRoom(room);
-    S.room = room; render();
-    return;
-  }
-  if(t < target.graceUntil){
-    log(room, targetName + ' was still in the grace period — catch failed!');
-    await saveRoom(room);
-    S.room = room; render();
-    return;
-  }
-  if(target.calloutsLeft && target.calloutsLeft>0){
-    target.calloutsLeft -= 1;
-    target.graceUntil = t + 5000;
-    log(room, targetName + ' wriggled free! (call-out used, ' + target.calloutsLeft + ' left)');
-  } else {
-    target.out = true;
-    log(room, targetName + ' was caught and is OUT!');
-  }
-  await saveRoom(room);
-  S.room = room;
-  render();
-}
-
-async function actPlayAgain(){
-  const room = await loadRoom(S.code);
-  if(!room) return;
-  room.phase = 'lobby';
-  room.winner = null; room.winnerType = null;
-  room.phaseStartedAt = null;
-  room.votes = {};
-  room.selectedMap = null;
-  for(const n in room.players){
-    room.players[n].role = 'unassigned';
-    room.players[n].out = false;
-  }
-  log(room, 'Back to the lobby for another round.');
-  await saveRoom(room);
-  S.room = room; S.screen = 'lobby';
-  render();
-}
-
-async function actLeaveRoom(){
-  stopPolling();
-  await clearSession();
-  S = {screen:'landing', username:'', code:'', room:null, error:'', showRules:false, busy:false};
-  render();
-}
-
-// ---------- POLLING ----------
-let lastRoomSnapshot = '';
-function startPolling(){
-  stopPolling();
-  pollTimer = setInterval(async ()=>{
-    if(!S.code) return;
-    const room = await loadRoom(S.code);
-    if(room){
-      const snapshot = JSON.stringify(room);
-      const changed = snapshot !== lastRoomSnapshot;
-      lastRoomSnapshot = snapshot;
-      S.room = room;
-      const phaseChanged = room.phase !== S.screen && ['lobby','hiding','seeking','ended'].includes(room.phase);
-      if(phaseChanged){
-        S.screen = room.phase;
-      }
-      await hostTick();
-      // Skip re-render if nothing changed while the user has a dropdown/input focused,
-      // so it isn't yanked out from under them mid-interaction.
-      const active = document.activeElement;
-      const isEditing = active && (active.tagName==='SELECT' || active.tagName==='INPUT');
-      if(changed || phaseChanged || !isEditing){
-        render();
-      }
-    }
-  }, 1500);
-  tickTimer = setInterval(()=>{
-    if(S.room && (S.screen==='hiding' || S.screen==='seeking')) render();
-  }, 500);
-}
-function stopPolling(){
-  if(pollTimer) clearInterval(pollTimer);
-  if(tickTimer) clearInterval(tickTimer);
-  pollTimer=null; tickTimer=null;
-}
-
-// ---------- RENDER ----------
-function render(){
-  const app = document.getElementById('app');
-  let html = '<div class="caution-stripe"></div>';
-  html += renderTopbar();
-  html += '<div class="content">';
-  switch(S.screen){
-    case 'landing': html += renderLanding(); break;
-    case 'lobby': html += renderLobby(); break;
-    case 'hiding': html += renderHiding(); break;
-    case 'seeking': html += renderSeeking(); break;
-    case 'ended': html += renderEnded(); break;
-  }
-  html += '</div>';
-  if(S.screen !== 'landing'){
-    html += '<div class="rules-fab" onclick="toggleRules()">?</div>';
-  }
-  if(S.showRules){
-    html += renderRulesModal();
-  }
-  app.innerHTML = html;
-}
-
-function renderTopbar(){
-  if(S.screen==='landing') return '<div class="topbar"></div>';
-  return '<div class="topbar">' +
-    '<div class="room-code">ROOM ' + esc(S.code) + '</div>' +
-    '<div style="font-size:13px;color:var(--text-dim);">' + esc(S.username) + '</div>' +
-  '</div>';
-}
-
-function renderLanding(){
-  return `
-    <div style="margin-top:30px;">
-      <div class="logo"><span class="hi">WALL</span> &amp; <span class="sk">SEEK</span></div>
-      <p class="subtle center" style="margin-top:8px;">Hide in plain sight. Freeze. Become the wall.</p>
+<div id="lobby-screen">
+  <div style="margin:20px 0;">
+    <div class="logo"><span class="hi">WALL</span> &amp; <span class="sk">SEEK</span></div>
+    <p class="subtle" style="text-align:center;margin-top:8px;">3D — move your avatar, freeze into a wall.</p>
+  </div>
+  <div id="landing-view">
+    <div class="card">
+      <div class="field"><label>Your name</label><input type="text" id="inp-name" placeholder="e.g. Sam" maxlength="16"></div>
+      <button class="btn btn-primary" id="btn-create">Create a Room</button>
     </div>
     <div class="card">
-      <div class="field">
-        <label>Your name</label>
-        <input type="text" id="inp-username" placeholder="e.g. Sam" maxlength="16">
-      </div>
-      <button class="btn btn-primary" onclick="actCreateRoom()" ${S.busy?'disabled':''}>Create a Room</button>
+      <div class="field"><label>Room code</label><input type="text" id="inp-code" placeholder="e.g. ABCD" maxlength="4" style="text-transform:uppercase;"></div>
+      <button class="btn btn-ghost" id="btn-join">Join a Room</button>
     </div>
-    <div class="card">
-      <div class="field">
-        <label>Room code</label>
-        <input type="text" id="inp-code" placeholder="e.g. ABCD" maxlength="4" style="text-transform:uppercase;">
-      </div>
-      <button class="btn btn-ghost" onclick="actJoinRoom()" ${S.busy?'disabled':''}>Join a Room</button>
-    </div>
-    ${S.error ? '<div class="error-text center">'+esc(S.error)+'</div>' : ''}
-  `;
-}
-
-function renderLobby(){
-  if(!S.room) return '<div class="loading-dot">Loading room…</div>';
-  const room = S.room;
-  const me = room.players[S.username];
-  const isHost = me && me.isHost;
-  const players = Object.entries(room.players);
-  let html = `<div class="card">
-    <h2>Lobby</h2>
-    <p class="subtle">Share the code <b style="color:var(--yellow)">${esc(room.code)}</b> with your friends. ${isHost ? "You're the host — set up the round below." : 'Waiting for the host to start...'}</p>
-  </div>`;
-
-  html += '<div class="card"><h3 style="margin-bottom:10px;">Players ('+players.length+')</h3>';
-  players.forEach(([n,p])=>{
-    html += `<div class="player-row">
-      <div class="player-name">${esc(n)} ${n===S.username?'<span class="you">YOU</span>':''}</div>
-      ${p.isHost ? '<span class="pill pill-host">Host</span>' : ''}
-    </div>`;
-  });
-  html += '</div>';
-
-  html += renderMapVoteCard(room);
-
-  if(isHost){
-    const s = room.settings;
-    html += `<div class="card">
+    <div class="error-text" id="landing-error"></div>
+  </div>
+  <div id="lobby-view" class="hidden" style="width:100%;max-width:400px;">
+    <div class="card"><h2>Lobby</h2><p class="subtle" id="lobby-sub"></p></div>
+    <div class="card"><h3 style="margin-bottom:8px;">Players</h3><div id="lobby-players"></div></div>
+    <div class="card hidden" id="host-settings">
       <h3 style="margin-bottom:12px;">Round Settings</h3>
-      <div class="field">
-        <label>Number of Seekers</label>
-        <select onchange="actUpdateSetting('seekerCount', parseInt(this.value))">
-          ${[1,2,3,4].map(n=>`<option value="${n}" ${s.seekerCount===n?'selected':''}>${n}</option>`).join('')}
+      <div class="field"><label>Number of Seekers</label>
+        <select id="set-seekerCount">
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
         </select>
       </div>
-      <div class="field">
-        <label>Seeking time limit (seconds)</label>
-        <input type="number" value="${s.seekSec}" onchange="actUpdateSetting('seekSec', parseInt(this.value)||600)">
-      </div>
-      <div class="field">
-        <label>Become-Wall uses per hider</label>
-        <input type="number" value="${s.wallUses}" onchange="actUpdateSetting('wallUses', parseInt(this.value)||0)">
-      </div>
-      <div class="field">
-        <label>Wall shield duration (seconds)</label>
-        <input type="number" value="${s.wallShieldSec}" onchange="actUpdateSetting('wallShieldSec', parseInt(this.value)||5)">
-      </div>
-      <div class="field">
-        <label>Call-outs per hider (spot a seeker to swap)</label>
-        <input type="number" value="${s.calloutUses}" onchange="actUpdateSetting('calloutUses', parseInt(this.value)||0)">
-      </div>
-      <div class="field" style="margin-bottom:0;">
-        <label>Grace period after a swap (seconds)</label>
-        <input type="number" value="${s.graceSec}" onchange="actUpdateSetting('graceSec', parseInt(this.value)||10)">
-      </div>
+      <div class="field"><label>Time to pick a hiding spot (seconds)</label><input type="number" id="set-hideSec"></div>
+      <div class="field"><label>Seeking time limit (seconds)</label><input type="number" id="set-seekSec"></div>
+      <div class="field"><label>Become-Wall uses per hider</label><input type="number" id="set-wallUses"></div>
+      <div class="field"><label>Wall shield duration (seconds)</label><input type="number" id="set-wallShieldSec"></div>
+      <div class="field"><label>Call-outs per hider</label><input type="number" id="set-calloutUses"></div>
+      <div class="field" style="margin-bottom:0;"><label>Grace period after a swap (seconds)</label><input type="number" id="set-graceSec"></div>
     </div>
-    <button class="btn btn-primary" onclick="actStartGame()">Start Round</button>`;
-  }
-  html += '<button class="btn btn-ghost" onclick="actLeaveRoom()">Leave Room</button>';
-  if(S.error) html += '<div class="error-text center">'+esc(S.error)+'</div>';
-  return html;
-}
+    <button class="btn btn-primary hidden" id="btn-start">Start Round</button>
+    <button class="btn btn-ghost" id="btn-leave">Leave Room</button>
+  </div>
+</div>
 
-function renderHiding(){
-  if(!S.room) return '<div class="loading-dot">Loading…</div>';
-  const room = S.room;
-  const me = room.players[S.username];
-  const isHider = me && me.role==='hider';
-  const isHost = me && me.isHost;
-  let html = '';
-  if(isHider){
-    html += `<div class="status-banner brick-bg">
-      <div style="font-family:'Anton',sans-serif;font-size:20px;">GO HIDE!</div>
-      <div class="subtle" style="margin-top:8px;color:#fff;">Playing on: <b>${esc(room.selectedMap || 'Anywhere')}</b></div>
+<div id="game-ui" class="hidden">
+  <div id="hud-top">
+    <div id="hud-room"></div>
+    <div>
+      <div id="hud-status"></div>
+      <div id="hud-timer"></div>
     </div>
-    <p class="subtle center">Find your spot. Once seeking starts you can tap <b>Become Wall</b> to freeze and dodge a catch — you get ${room.settings.wallUses} uses.</p>`;
-  } else {
-    html += `<div class="status-banner" style="background:var(--surface-2);">
-      <div style="font-family:'Anton',sans-serif;font-size:20px;color:var(--seeker);">NO PEEKING</div>
-      <div class="subtle" style="margin-top:8px;">Playing on: <b style="color:var(--text)">${esc(room.selectedMap || 'Anywhere')}</b></div>
-      <p class="subtle" style="margin-top:8px;">Hiders are hiding. ${isHost ? 'Tap below once everyone is ready.' : 'Waiting for the host to start seeking.'}</p>
-    </div>`;
-  }
-  if(isHost){
-    html += `<button class="btn btn-primary" onclick="actStartSeeking()">Everyone's Hidden — Start Seeking</button>`;
-  }
-  html += renderPlayerList(room, false);
-  return html;
-}
-
-function renderSeeking(){
-  if(!S.room) return '<div class="loading-dot">Loading…</div>';
-  const room = S.room;
-  const me = room.players[S.username];
-  const t = now();
-  const remaining = room.settings.seekSec*1000 - (t-room.phaseStartedAt);
-
-  let html = `<div class="timer-label">Time Left</div><div class="timer center">${fmtTime(remaining)}</div>
-    <p class="subtle center" style="margin-top:2px;">Playing on: <b style="color:var(--text)">${esc(room.selectedMap || 'Anywhere')}</b></p>`;
-
-  if(me && me.out){
-    html += `<div class="status-banner" style="background:var(--surface-2);margin-top:12px;">
-      <div style="color:var(--concrete);font-family:'Anton',sans-serif;">YOU'RE OUT</div>
-      <p class="subtle" style="margin-top:6px;">Watch how the round plays out below.</p>
-    </div>`;
-  } else if(me && me.role==='hider'){
-    const shielded = t < me.wallShieldUntil;
-    const cooling = !shielded && t < me.wallCooldownUntil;
-    const inGrace = t < me.graceUntil;
-    html += `<div class="${shielded?'brick-bg':'card'}" style="margin-top:12px;">
-      <div class="center" style="font-family:'Anton',sans-serif;font-size:18px;${shielded?'':'color:var(--hider);'}">
-        ${shielded ? 'YOU ARE THE WALL' : (inGrace ? 'GRACE PERIOD — GO HIDE' : 'YOU ARE HIDING')}
-      </div>
-      ${shielded ? '<div class="center" style="margin-top:4px;">Immune for '+fmtTime(me.wallShieldUntil-t)+'</div>' : ''}
-      ${inGrace && !shielded ? '<div class="center subtle" style="margin-top:4px;">Immune for '+fmtTime(me.graceUntil-t)+'</div>' : ''}
-      <div style="margin-top:14px;">
-        <button class="btn btn-hider" onclick="actBecomeWall()" ${(me.wallUsesLeft<=0 || cooling || shielded)?'disabled':''}>
-          ${shielded ? 'Shield Active' : (cooling ? 'Cooling Down ('+fmtTime(me.wallCooldownUntil-t)+')' : 'Become Wall ('+me.wallUsesLeft+' left)')}
-        </button>
-      </div>
-    </div>`;
-
-    const seekers = activePlayers(room).filter(([n,p])=>p.role==='seeker');
-    html += `<div class="card">
-      <h3 style="margin-bottom:8px;">Spot a Seeker?</h3>
-      <p class="subtle" style="margin-bottom:10px;">If you see one before they see you, call them out — you'll swap roles. Call-outs left: <b style="color:var(--hider)">${me.calloutsLeft}</b></p>`;
-    if(seekers.length===0){
-      html += '<p class="subtle">No active seekers right now.</p>';
-    } else {
-      seekers.forEach(([n,p])=>{
-        html += `<div class="player-row">
-          <div class="player-name">${esc(n)}</div>
-          <button class="btn btn-seeker" style="width:auto;padding:8px 14px;font-size:13px;" onclick="actCallOut('${esc(n)}')" ${me.calloutsLeft<=0?'disabled':''}>Call Out</button>
-        </div>`;
-      });
-    }
-    html += '</div>';
-  } else if(me && me.role==='seeker'){
-    html += `<div class="card" style="margin-top:12px;">
-      <div class="center" style="font-family:'Anton',sans-serif;font-size:18px;color:var(--seeker);">YOU ARE SEEKING</div>
-      <p class="subtle center" style="margin-top:6px;">Find a hider in real life, then tap their name below to catch them. Watch out — hiders can call YOU out if they spot you first.</p>
-    </div>`;
-    const hiders = activePlayers(room).filter(([n,p])=>p.role==='hider');
-    html += `<div class="card"><h3 style="margin-bottom:8px;">Caught someone?</h3>`;
-    if(hiders.length===0){
-      html += '<p class="subtle">No hiders left active.</p>';
-    } else {
-      hiders.forEach(([n,p])=>{
-        const shielded = t < p.wallShieldUntil;
-        const inGrace = t < p.graceUntil;
-        html += `<div class="player-row">
-          <div class="player-name">${esc(n)} ${shielded?'<span class="pill pill-hider">Wall</span>':(inGrace?'<span class="pill pill-hider">Grace</span>':'')}</div>
-          <button class="btn btn-seeker" style="width:auto;padding:8px 14px;font-size:13px;" onclick="actCatch('${esc(n)}')">Tag / Catch</button>
-        </div>`;
-      });
-    }
-    html += '</div>';
-  }
-
-  html += renderPlayerList(room, true);
-  html += renderLog(room);
-  return html;
-}
-
-function renderEnded(){
-  if(!S.room) return '<div class="loading-dot">Loading…</div>';
-  const room = S.room;
-  const me = room.players[S.username];
-  const isHost = me && me.isHost;
-  let headline = 'Round Over';
-  let sub = '';
-  if(room.winnerType==='lastStanding' && room.winner){
-    headline = room.winner + ' Wins!';
-    sub = 'Last one standing.';
-  } else if(room.winnerType==='seekers'){
-    headline = 'Seekers Win!';
-    sub = 'Every hider was caught.';
-  } else if(room.winnerType==='hiders'){
-    headline = 'Hiders Win!';
-    sub = 'Time ran out and hiders were still free.';
-  }
-  let html = `<div class="status-banner" style="background:var(--surface-2);">
-    <div style="font-family:'Anton',sans-serif;font-size:24px;color:var(--yellow);">${esc(headline)}</div>
-    <p class="subtle" style="margin-top:6px;">${esc(sub)}</p>
-  </div>`;
-  html += renderPlayerList(room, true);
-  html += renderLog(room);
-  if(isHost){
-    html += '<button class="btn btn-primary" onclick="actPlayAgain()">Play Again</button>';
-  } else {
-    html += '<p class="subtle center">Waiting for the host to start a new round…</p>';
-  }
-  html += '<button class="btn btn-ghost" onclick="actLeaveRoom()">Leave Room</button>';
-  return html;
-}
-
-function renderMapVoteCard(room){
-  const options = room.settings.mapOptions || [];
-  const votes = room.votes || {};
-  const counts = {};
-  options.forEach(m=>counts[m]=0);
-  Object.values(votes).forEach(v=>{ if(counts[v]!==undefined) counts[v]++; });
-  const myVote = votes[S.username];
-  const totalVotes = Object.keys(votes).length;
-  let html = `<div class="card">
-    <h3 style="margin-bottom:4px;">Vote for a Map</h3>
-    <p class="subtle" style="margin-bottom:12px;">Whichever spot has the most votes is where you'll play.</p>`;
-  options.forEach(m=>{
-    const isMine = myVote===m;
-    const pct = totalVotes>0 ? Math.round((counts[m]/totalVotes)*100) : 0;
-    html += `<div class="player-row">
-      <div>
-        <div class="player-name">${esc(m)} ${isMine?'<span class="you">YOUR VOTE</span>':''}</div>
-        <div class="subtle" style="font-size:12px;margin-top:2px;">${counts[m]} vote${counts[m]===1?'':'s'}${totalVotes>0?' · '+pct+'%':''}</div>
-      </div>
-      <button class="btn ${isMine?'btn-hider':'btn-ghost'}" style="width:auto;padding:8px 14px;font-size:13px;" onclick="actVoteMap('${esc(m)}')">${isMine?'Voted':'Vote'}</button>
-    </div>`;
-  });
-  html += '</div>';
-  return html;
-}
-
-function renderPlayerList(room, showStatus){
-  const t = now();
-  let html = '<div class="card"><h3 style="margin-bottom:8px;">Players</h3>';
-  Object.entries(room.players).forEach(([n,p])=>{
-    let pill = '';
-    if(p.out) pill = '<span class="pill pill-out">Out</span>';
-    else if(p.role==='hider') pill = '<span class="pill pill-hider">Hider</span>';
-    else if(p.role==='seeker') pill = '<span class="pill pill-seeker">Seeker</span>';
-    html += `<div class="player-row">
-      <div class="player-name">${esc(n)} ${n===S.username?'<span class="you">YOU</span>':''}</div>
-      <div>${pill}</div>
-    </div>`;
-  });
-  html += '</div>';
-  return html;
-}
-
-function renderLog(room){
-  if(!room.log || room.log.length===0) return '';
-  let html = '<div class="card"><h3 style="margin-bottom:8px;">Live Feed</h3><div class="log">';
-  [...room.log].reverse().slice(0,15).forEach(item=>{
-    html += `<div class="log-item">${esc(item.text)}</div>`;
-  });
-  html += '</div></div>';
-  return html;
-}
-
-function renderRulesModal(){
-  return `<div class="modal-overlay" onclick="if(event.target===this) toggleRules()">
-    <div class="modal">
-      <button class="close-modal" onclick="toggleRules()">✕</button>
-      <h2>How to Play</h2>
-      <div class="rule-block">
-        <div class="rule-title"><span class="num">1</span>Vote for a Map</div>
-        <p class="subtle">In the lobby, everyone votes on where to play. Whichever spot has the most votes is locked in for the round.</p>
-      </div>
-      <div class="rule-block">
-        <div class="rule-title"><span class="num">2</span>Roles</div>
-        <p class="subtle">The host picks how many Seekers there are — everyone else is a Hider. Hiders go hide somewhere in the chosen spot while Seekers wait. There's no countdown — the host taps "Start Seeking" once everyone's ready.</p>
-      </div>
-      <div class="rule-block">
-        <div class="rule-title"><span class="num">3</span>Become Wall</div>
-        <p class="subtle">Each Hider gets a limited number of "Become Wall" taps. Tapping it shields you for a short window — if a Seeker tries to catch you during that time, the catch fails. There's a cooldown before you can use it again.</p>
-      </div>
-      <div class="rule-block">
-        <div class="rule-title"><span class="num">4</span>Catching</div>
-        <p class="subtle">When a Seeker physically finds a Hider, they tap that Hider's name to catch them. If the Hider still has a call-out in reserve, they wriggle free instead of being eliminated. Once out of call-outs, a catch means they're OUT.</p>
-      </div>
-      <div class="rule-block">
-        <div class="rule-title"><span class="num">5</span>Turning the Tables</div>
-        <p class="subtle">If a Hider spots a Seeker first, they can tap "Call Out" on that Seeker's name. Roles instantly swap: the Seeker becomes a Hider (with a short grace period to go hide), and the Hider becomes a Seeker.</p>
-      </div>
-      <div class="rule-block">
-        <div class="rule-title"><span class="num">6</span>Winning</div>
-        <p class="subtle">The round ends when only one player remains active, when every Hider has been caught (Seekers win), or when the seek timer runs out (Hiders win if any are still free).</p>
-      </div>
+  </div>
+  <div id="hud-log"></div>
+  <div id="hud-bottom">
+    <div id="joystick-zone">
+      <div id="joystick-base"></div>
+      <div id="joystick-nub"></div>
     </div>
-  </div>`;
+    <div id="action-buttons">
+      <button class="action-btn" id="catch-btn">Tag / Catch</button>
+      <button class="action-btn" id="callout-btn">Call Out</button>
+      <button class="action-btn" id="wall-btn">Become Wall</button>
+    </div>
+  </div>
+  <div id="rules-fab">?</div>
+</div>
+
+<div id="end-overlay" class="hidden">
+  <div id="end-card">
+    <h2 id="end-headline" style="color:var(--yellow);"></h2>
+    <p class="subtle" id="end-sub" style="margin:10px 0 18px;"></p>
+    <button class="btn btn-primary hidden" id="btn-play-again">Play Again</button>
+    <button class="btn btn-ghost" id="btn-end-leave" style="margin-top:8px;">Leave Room</button>
+  </div>
+</div>
+
+<div id="rules-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <button class="close-modal" id="close-rules">✕</button>
+    <h2 style="margin-bottom:14px;">How to Play</h2>
+    <div class="rule-block"><div class="rule-title">1. Roles</div><p class="subtle">The host picks how many Seekers there are. Everyone else is a Hider.</p></div>
+    <div class="rule-block"><div class="rule-title">2. Hiding</div><p class="subtle">Hiders get a short window to move around the room and find a spot before Seekers can move at all.</p></div>
+    <div class="rule-block"><div class="rule-title">3. Become Wall</div><p class="subtle">Each Hider gets a limited number of "Become Wall" taps. While active, you're frozen and shielded — a Seeker's catch fails against you. No cooldown between uses, but each use is limited in duration and you have a limited number of them.</p></div>
+    <div class="rule-block"><div class="rule-title">4. Catching</div><p class="subtle">Walk close to a Hider as a Seeker and tap Tag/Catch. If they still have call-outs in reserve, they wriggle free instead of being eliminated.</p></div>
+    <div class="rule-block"><div class="rule-title">5. Turning the Tables</div><p class="subtle">As a Hider, walk close to a Seeker and tap Call Out to instantly swap roles with them.</p></div>
+    <div class="rule-block"><div class="rule-title">6. Winning</div><p class="subtle">Last player active wins, or Seekers win by catching every Hider, or Hiders win if time runs out with any still free.</p></div>
+  </div>
+</div>
+
+<script>
+// ================= NETWORKING =================
+let ws = null;
+let myName = '';
+let myCode = '';
+let roomState = null;
+let positions = {};
+
+function wsUrl(){
+  const proto = location.protocol==='https:' ? 'wss:' : 'ws:';
+  return proto + '//' + location.host;
+}
+function connectWS(onOpen){
+  ws = new WebSocket(wsUrl());
+  ws.onopen = ()=>{ if(onOpen) onOpen(); };
+  ws.onmessage = (ev)=>{
+    let msg;
+    try{ msg = JSON.parse(ev.data); }catch(e){ return; }
+    if(msg.type==='state') onState(msg.room);
+    else if(msg.type==='positions') onPositions(msg.positions);
+    else if(msg.type==='error') showLandingError(msg.message);
+  };
+  ws.onclose = ()=>{ setTimeout(()=>{ if(myName && myCode) connectWS(()=>send({type:'joinRoom', name:myName, code:myCode})); }, 1500); };
+}
+function send(obj){ if(ws && ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify(obj)); }
+
+function showLandingError(msg){
+  document.getElementById('landing-error').textContent = msg;
 }
 
-function toggleRules(){
-  S.showRules = !S.showRules;
-  render();
-}
+// ================= LOBBY UI =================
+document.getElementById('btn-create').onclick = ()=>{
+  const name = document.getElementById('inp-name').value.trim();
+  if(!name){ showLandingError('Enter a name first.'); return; }
+  myName = name;
+  connectWS(()=> send({type:'createRoom', name}));
+};
+document.getElementById('btn-join').onclick = ()=>{
+  const name = document.getElementById('inp-name').value.trim();
+  const code = document.getElementById('inp-code').value.trim().toUpperCase();
+  if(!name){ showLandingError('Enter a name first.'); return; }
+  if(!code){ showLandingError('Enter a room code.'); return; }
+  myName = name; myCode = code;
+  connectWS(()=> send({type:'joinRoom', name, code}));
+};
+document.getElementById('btn-leave').onclick = ()=>{ send({type:'leaveRoom'}); location.reload(); };
+document.getElementById('btn-end-leave').onclick = ()=>{ send({type:'leaveRoom'}); location.reload(); };
+document.getElementById('btn-start').onclick = ()=> send({type:'startGame'});
+document.getElementById('btn-play-again').onclick = ()=> send({type:'playAgain'});
+document.getElementById('close-rules').onclick = ()=> document.getElementById('rules-modal').classList.add('hidden');
+document.getElementById('rules-fab').onclick = ()=> document.getElementById('rules-modal').classList.remove('hidden');
 
-// ---------- INIT ----------
-async function init(){
-  try{
-    const sess = readSession();
-    if(sess && sess.username && sess.code){
-      const room = await loadRoom(sess.code);
-      if(room && room.players[sess.username]){
-        S.username = sess.username;
-        S.code = sess.code;
-        S.room = room;
-        S.screen = room.phase || 'lobby';
-        startPolling();
+['seekerCount','hideSec','seekSec','wallUses','wallShieldSec','calloutUses','graceSec'].forEach(key=>{
+  document.getElementById('set-'+key).addEventListener('change', (e)=>{
+    send({type:'updateSetting', key, value: e.target.value});
+  });
+});
+
+let lastPhase = null;
+function onState(room){
+  myCode = room.code;
+  roomState = room;
+  const me = room.players[myName];
+  if(!me){ return; }
+
+  if(room.phase==='lobby'){
+    document.getElementById('lobby-screen').style.display='flex';
+    document.getElementById('game-ui').classList.add('hidden');
+    document.getElementById('end-overlay').classList.add('hidden');
+    document.getElementById('landing-view').classList.add('hidden');
+    document.getElementById('lobby-view').classList.remove('hidden');
+    document.getElementById('lobby-sub').innerHTML = 'Room <b style="color:var(--yellow)">'+room.code+'</b>. '+(me.isHost?'You\u2019re the host.':'Waiting for host to start...');
+    const list = Object.entries(room.players);
+    document.getElementById('lobby-players').innerHTML = list.map(([n,p])=>
+      '<div class="player-row"><div>'+esc(n)+(n===myName?' <span class="pill pill-host" style="background:rgba(255,201,60,.1);">YOU</span>':'')+'</div>'+(p.isHost?'<span class="pill pill-host">Host</span>':'')+'</div>'
+    ).join('');
+    document.getElementById('host-settings').classList.toggle('hidden', !me.isHost);
+    document.getElementById('btn-start').classList.toggle('hidden', !me.isHost);
+    if(me.isHost){
+      const s = room.settings;
+      for(const key of ['seekerCount','hideSec','seekSec','wallUses','wallShieldSec','calloutUses','graceSec']){
+        const el = document.getElementById('set-'+key);
+        if(document.activeElement!==el) el.value = s[key];
       }
     }
-  }catch(e){}
-  render();
+  } else {
+    document.getElementById('lobby-screen').style.display='none';
+    document.getElementById('game-ui').classList.remove('hidden');
+    document.getElementById('hud-room').textContent = 'ROOM '+room.code;
+  }
+
+  if(room.phase==='ended'){
+    document.getElementById('end-overlay').classList.remove('hidden');
+    let headline='Round Over', sub='';
+    if(room.winnerType==='lastStanding' && room.winner){ headline=room.winner+' Wins!'; sub='Last one standing.'; }
+    else if(room.winnerType==='seekers'){ headline='Seekers Win!'; sub='Every hider was caught.'; }
+    else if(room.winnerType==='hiders'){ headline='Hiders Win!'; sub='Time ran out and hiders were still free.'; }
+    document.getElementById('end-headline').textContent = headline;
+    document.getElementById('end-sub').textContent = sub;
+    document.getElementById('btn-play-again').classList.toggle('hidden', !me.isHost);
+  } else {
+    document.getElementById('end-overlay').classList.add('hidden');
+  }
+
+  // status HUD
+  const statusEl = document.getElementById('hud-status');
+  const timerEl = document.getElementById('hud-timer');
+  if(room.phase==='hiding'){
+    statusEl.textContent = me.role==='hider' ? 'GO HIDE!' : 'NO PEEKING — WAIT';
+    statusEl.style.color = me.role==='hider' ? 'var(--hider)' : 'var(--seeker)';
+    timerEl.textContent = '';
+  } else if(room.phase==='seeking'){
+    if(me.out){ statusEl.textContent="YOU'RE OUT"; statusEl.style.color='var(--text-dim)'; }
+    else if(me.role==='seeker'){ statusEl.textContent='SEEKING'; statusEl.style.color='var(--seeker)'; }
+    else { statusEl.textContent = now()<me.wallUntil ? 'YOU ARE THE WALL' : 'HIDING'; statusEl.style.color='var(--hider)'; }
+  }
+
+  // log
+  const logDiv = document.getElementById('hud-log');
+  logDiv.innerHTML = (room.log||[]).slice(-6).reverse().map(i=>esc(i.text)).join('<br>');
+
+  // wall button state
+  const wallBtn = document.getElementById('wall-btn');
+  if(room.phase==='seeking' && me.role==='hider' && !me.out){
+    wallBtn.style.display='block';
+    const walled = now()<me.wallUntil;
+    wallBtn.disabled = me.wallUsesLeft<=0 || walled;
+    wallBtn.textContent = walled ? 'Shielded' : ('Become Wall ('+me.wallUsesLeft+')');
+  } else {
+    wallBtn.style.display='none';
+  }
+
+  if(room.phase!==lastPhase){
+    lastPhase = room.phase;
+    if(room.phase==='hiding' || room.phase==='seeking') initSceneIfNeeded();
+  }
 }
 
-init();
+function now(){ return Date.now(); }
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function onPositions(pos){
+  positions = pos;
+}
+
+// ================= THREE.JS SCENE =================
+let scene, camera, renderer, clock;
+let avatarMeshes = {}; // name -> {group, body, label}
+let sceneReady = false;
+const ROOM_HALF = 20;
+
+function initSceneIfNeeded(){
+  if(sceneReady) return;
+  sceneReady = true;
+  const canvas = document.getElementById('scene');
+  renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x15171a);
+  scene.fog = new THREE.Fog(0x15171a, 25, 55);
+
+  camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 200);
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x222233, 0.9);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  dir.position.set(10,20,10);
+  scene.add(dir);
+
+  // floor
+  const floorGeo = new THREE.PlaneGeometry(ROOM_HALF*2, ROOM_HALF*2);
+  const floorMat = new THREE.MeshStandardMaterial({color:0x1e2124});
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI/2;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(ROOM_HALF*2, 20, 0x33383d, 0x2a2e33);
+  scene.add(grid);
+
+  // boundary walls
+  const wallMat = new THREE.MeshStandardMaterial({color:0x2f3438});
+  const wallH = 4, wallT = 1;
+  const positionsWalls = [
+    [0, wallH/2, -ROOM_HALF-wallT/2, ROOM_HALF*2+wallT*2, wallH, wallT],
+    [0, wallH/2, ROOM_HALF+wallT/2, ROOM_HALF*2+wallT*2, wallH, wallT],
+    [-ROOM_HALF-wallT/2, wallH/2, 0, wallT, wallH, ROOM_HALF*2],
+    [ROOM_HALF+wallT/2, wallH/2, 0, wallT, wallH, ROOM_HALF*2],
+  ];
+  positionsWalls.forEach(([x,y,z,w,h,d])=>{
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), wallMat);
+    m.position.set(x,y,z);
+    scene.add(m);
+  });
+
+  // obstacles for cover
+  const obsMat = new THREE.MeshStandardMaterial({color:0xb0492e});
+  const obstacles = [
+    [-10,-8,2.4,2.4,2.4],[10,8,2.4,2.4,2.4],[7,-11,2,2,2],[-7,11,2,2,2],
+    [0,13,3,1.6,3],[13,-2,1.6,2.6,1.6],[-13,2,1.6,2.6,1.6],
+  ];
+  obstacles.forEach(([x,z,w,h,d])=>{
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), obsMat);
+    m.position.set(x,h/2,z);
+    scene.add(m);
+  });
+
+  clock = new THREE.Clock();
+  animate();
+  window.addEventListener('resize', onResize);
+}
+function onResize(){
+  if(!renderer) return;
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function makeLabelSprite(text){
+  const c = document.createElement('canvas');
+  c.width=256; c.height=64;
+  const ctx = c.getContext('2d');
+  ctx.font='bold 34px Inter, sans-serif';
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  ctx.fillRect(0,0,256,64);
+  ctx.fillStyle='#f3f1ea';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex, depthTest:false});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(2.4,0.6,1);
+  sprite.position.y = 2.2;
+  return sprite;
+}
+
+function colorForRole(role, out, walled){
+  if(out) return 0x555b60;
+  if(walled) return 0xb0492e;
+  if(role==='seeker') return 0xff5d5d;
+  if(role==='hider') return 0x3ddc97;
+  return 0x9ba1a6;
+}
+
+function ensureAvatar(name){
+  if(avatarMeshes[name]) return avatarMeshes[name];
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({color:0x9ba1a6});
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry ? new THREE.CapsuleGeometry(0.5,1.0,4,8) : new THREE.CylinderGeometry(0.5,0.5,1.6,10), bodyMat);
+  body.position.y = 1.0;
+  group.add(body);
+  const label = makeLabelSprite(name);
+  group.add(label);
+  scene.add(group);
+  const rec = {group, body, label};
+  avatarMeshes[name] = rec;
+  return rec;
+}
+function removeStaleAvatars(currentNames){
+  for(const n of Object.keys(avatarMeshes)){
+    if(!currentNames.includes(n)){
+      scene.remove(avatarMeshes[n].group);
+      delete avatarMeshes[n];
+    }
+  }
+}
+
+// ================= CONTROLS =================
+let move = {x:0, z:0};
+const keys = {};
+window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; });
+window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+const joyZone = document.getElementById('joystick-zone');
+const joyNub = document.getElementById('joystick-nub');
+let joyActive=false, joyStart=null;
+function joyVecFromEvent(e){
+  const rect = joyZone.getBoundingClientRect();
+  const cx = rect.left+rect.width/2, cy = rect.top+rect.height/2;
+  const px = (e.touches?e.touches[0].clientX:e.clientX);
+  const py = (e.touches?e.touches[0].clientY:e.clientY);
+  let dx = px-cx, dy = py-cy;
+  const max = rect.width/2;
+  const len = Math.sqrt(dx*dx+dy*dy);
+  if(len>max){ dx = dx/len*max; dy = dy/len*max; }
+  joyNub.style.transform = 'translate('+dx+'px,'+dy+'px)';
+  return {x: dx/max, z: dy/max};
+}
+function joyReset(){
+  joyNub.style.transform = 'translate(0px,0px)';
+  move.x=0; move.z=0;
+}
+joyZone.addEventListener('touchstart', e=>{ joyActive=true; move=joyVecFromEvent(e); }, {passive:true});
+joyZone.addEventListener('touchmove', e=>{ if(joyActive) move=joyVecFromEvent(e); }, {passive:true});
+joyZone.addEventListener('touchend', ()=>{ joyActive=false; joyReset(); });
+joyZone.addEventListener('mousedown', e=>{ joyActive=true; move=joyVecFromEvent(e); });
+window.addEventListener('mousemove', e=>{ if(joyActive) move=joyVecFromEvent(e); });
+window.addEventListener('mouseup', ()=>{ if(joyActive){ joyActive=false; joyReset(); } });
+
+let myPos = {x:0, z:0, rotY:0};
+let lastSent = 0;
+
+document.getElementById('wall-btn').onclick = ()=> send({type:'becomeWall'});
+document.getElementById('catch-btn').onclick = ()=>{
+  const target = nearestOpponent('hider');
+  if(target) send({type:'catch', target});
+};
+document.getElementById('callout-btn').onclick = ()=>{
+  const target = nearestOpponent('seeker');
+  if(target) send({type:'callOut', target});
+};
+
+function nearestOpponent(role){
+  let best=null, bestD=3.2;
+  for(const [n,p] of Object.entries(positions)){
+    if(n===myName || p.role!==role || p.out) continue;
+    const dx=myPos.x-p.x, dz=myPos.z-p.z;
+    const d=Math.sqrt(dx*dx+dz*dz);
+    if(d<bestD){ bestD=d; best=n; }
+  }
+  return best;
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  updateMovement(dt);
+  updateAvatars();
+  updateActionButtons();
+  updateCamera();
+  if(renderer) renderer.render(scene, camera);
+}
+
+function updateMovement(dt){
+  if(!roomState) return;
+  const me = roomState.players[myName];
+  if(!me || me.out) return;
+  const phase = roomState.phase;
+  if(phase==='hiding' && me.role!=='hider') return;
+  if(phase!=='hiding' && phase!=='seeking') return;
+  if(now() < me.wallUntil) return; // frozen while a wall
+
+  let kx=0, kz=0;
+  if(keys['w']||keys['arrowup']) kz -= 1;
+  if(keys['s']||keys['arrowdown']) kz += 1;
+  if(keys['a']||keys['arrowleft']) kx -= 1;
+  if(keys['d']||keys['arrowright']) kx += 1;
+  kx += move.x; kz += move.z;
+  const len = Math.sqrt(kx*kx+kz*kz);
+  if(len>0.05){
+    kx/=Math.max(len,1); kz/=Math.max(len,1);
+    const speed = 6.5;
+    myPos.x = Math.max(-ROOM_HALF+0.5, Math.min(ROOM_HALF-0.5, myPos.x + kx*speed*dt));
+    myPos.z = Math.max(-ROOM_HALF+0.5, Math.min(ROOM_HALF-0.5, myPos.z + kz*speed*dt));
+    myPos.rotY = Math.atan2(kx, kz);
+  }
+  const t = performance.now();
+  if(t-lastSent>60){
+    lastSent = t;
+    send({type:'move', x:myPos.x, z:myPos.z, rotY:myPos.rotY});
+  }
+  // reflect locally immediately for responsiveness
+  positions[myName] = {x:myPos.x, z:myPos.z, rotY:myPos.rotY, role:me.role, out:me.out, walled: now()<me.wallUntil};
+}
+
+function updateAvatars(){
+  if(!roomState) return;
+  const names = Object.keys(roomState.players);
+  removeStaleAvatars(names);
+  names.forEach(n=>{
+    const p = roomState.players[n];
+    const pos = positions[n] || {x:0,z:0,rotY:0};
+    if(p.out) return; // don't render eliminated players
+    const rec = ensureAvatar(n);
+    rec.group.position.x += (pos.x - rec.group.position.x) * 0.35;
+    rec.group.position.z += (pos.z - rec.group.position.z) * 0.35;
+    rec.group.rotation.y = pos.rotY||0;
+    const walled = now() < (p.wallUntil||0);
+    rec.body.material.color.setHex(colorForRole(p.role, p.out, walled));
+    rec.body.scale.set(1, walled?0.6:1, 1);
+  });
+  // hide meshes for out players
+  Object.entries(roomState.players).forEach(([n,p])=>{
+    if(p.out && avatarMeshes[n]){ scene.remove(avatarMeshes[n].group); delete avatarMeshes[n]; }
+  });
+}
+
+function updateActionButtons(){
+  if(!roomState) return;
+  const me = roomState.players[myName];
+  const catchBtn = document.getElementById('catch-btn');
+  const calloutBtn = document.getElementById('callout-btn');
+  catchBtn.style.display='none'; calloutBtn.style.display='none';
+  if(!me || me.out || roomState.phase!=='seeking') return;
+  if(me.role==='seeker'){
+    if(nearestOpponent('hider')) catchBtn.style.display='block';
+  } else if(me.role==='hider'){
+    if(me.calloutsLeft>0 && nearestOpponent('seeker')) calloutBtn.style.display='block';
+  }
+}
+
+function updateCamera(){
+  if(!camera) return;
+  const back = new THREE.Vector3(Math.sin(myPos.rotY)*-7, 5.5, Math.cos(myPos.rotY)*-7);
+  const targetPos = new THREE.Vector3(myPos.x+back.x, back.y, myPos.z+back.z);
+  camera.position.lerp(targetPos, 0.12);
+  camera.lookAt(myPos.x, 1.2, myPos.z);
+}
 </script>
 </body>
 </html>
