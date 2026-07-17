@@ -299,9 +299,9 @@ const DEFAULT_SETTINGS = {
   wallShieldSec: 8,
   wallCooldownSec: 15,
   calloutUses: 2,
-  hideSec: 30,
   seekSec: 600,
-  graceSec: 15
+  graceSec: 15,
+  mapOptions: ['Living Room', 'Backyard', 'Park', 'Whole House', 'School']
 };
 
 // ---------- STATE ----------
@@ -389,6 +389,21 @@ function myPlayer(){
   if(!S.room || !S.room.players[S.username]) return null;
   return S.room.players[S.username];
 }
+function tallyMap(room){
+  const options = room.settings.mapOptions || [];
+  const counts = {};
+  options.forEach(m=>counts[m]=0);
+  Object.values(room.votes || {}).forEach(v=>{
+    if(counts[v]!==undefined) counts[v]++;
+  });
+  let bestCount = -1, tied = [];
+  options.forEach(m=>{
+    if(counts[m] > bestCount){ bestCount = counts[m]; tied = [m]; }
+    else if(counts[m] === bestCount){ tied.push(m); }
+  });
+  if(tied.length===0) return options[0] || null;
+  return tied[Math.floor(Math.random()*tied.length)];
+}
 
 // ---------- GAME LOGIC (host-driven auto transitions) ----------
 async function hostTick(){
@@ -398,15 +413,7 @@ async function hostTick(){
   let changed = false;
   const t = now();
 
-  if(room.phase === 'hiding'){
-    const elapsed = t - room.phaseStartedAt;
-    if(elapsed >= room.settings.hideSec*1000){
-      room.phase = 'seeking';
-      room.phaseStartedAt = t;
-      log(room, 'Seeking has begun! Seekers are on the move.');
-      changed = true;
-    }
-  } else if(room.phase === 'seeking'){
+  if(room.phase === 'seeking'){
     // check grace expiries handled client-side visually, no state change needed
     const elapsed = t - room.phaseStartedAt;
     const active = activePlayers(room);
@@ -446,6 +453,8 @@ async function actCreateRoom(){
     players: {
       [name]: {isHost:true, role:'unassigned', out:false, joinedAt: now()}
     },
+    votes: {},
+    selectedMap: null,
     log: [],
     winner: null,
     winnerType: null,
@@ -490,6 +499,16 @@ async function actUpdateSetting(key, val){
   render();
 }
 
+async function actVoteMap(mapName){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  room.votes = room.votes || {};
+  room.votes[S.username] = mapName;
+  await saveRoom(room);
+  S.room = room;
+  render();
+}
+
 async function actStartGame(){
   const room = await loadRoom(S.code);
   if(!room) return;
@@ -514,13 +533,27 @@ async function actStartGame(){
       p.graceUntil = 0;
     }
   }
+  room.selectedMap = tallyMap(room);
   room.phase = 'hiding';
   room.phaseStartedAt = now();
   room.winner = null; room.winnerType = null;
   room.log = [];
-  log(room, 'A new round begins. Hiders, go hide!');
+  log(room, 'Playing on: ' + room.selectedMap + '. Hiders, go hide!');
   await saveRoom(room);
   S.room = room; S.screen='hiding'; S.error='';
+  render();
+}
+
+async function actStartSeeking(){
+  const room = await loadRoom(S.code);
+  if(!room) return;
+  const me = room.players[S.username];
+  if(!me || !me.isHost || room.phase!=='hiding') return;
+  room.phase = 'seeking';
+  room.phaseStartedAt = now();
+  log(room, 'Seeking has begun! Seekers are on the move.');
+  await saveRoom(room);
+  S.room = room; S.screen='seeking';
   render();
 }
 
@@ -606,6 +639,8 @@ async function actPlayAgain(){
   room.phase = 'lobby';
   room.winner = null; room.winnerType = null;
   room.phaseStartedAt = null;
+  room.votes = {};
+  room.selectedMap = null;
   for(const n in room.players){
     room.players[n].role = 'unassigned';
     room.players[n].out = false;
@@ -734,6 +769,8 @@ function renderLobby(){
   });
   html += '</div>';
 
+  html += renderMapVoteCard(room);
+
   if(isHost){
     const s = room.settings;
     html += `<div class="card">
@@ -743,10 +780,6 @@ function renderLobby(){
         <select onchange="actUpdateSetting('seekerCount', parseInt(this.value))">
           ${[1,2,3,4].map(n=>`<option value="${n}" ${s.seekerCount===n?'selected':''}>${n}</option>`).join('')}
         </select>
-      </div>
-      <div class="field">
-        <label>Hiding time (seconds)</label>
-        <input type="number" value="${s.hideSec}" onchange="actUpdateSetting('hideSec', parseInt(this.value)||30)">
       </div>
       <div class="field">
         <label>Seeking time limit (seconds)</label>
@@ -780,21 +813,24 @@ function renderHiding(){
   if(!S.room) return '<div class="loading-dot">Loading…</div>';
   const room = S.room;
   const me = room.players[S.username];
-  const remaining = room.settings.hideSec*1000 - (now()-room.phaseStartedAt);
   const isHider = me && me.role==='hider';
+  const isHost = me && me.isHost;
   let html = '';
   if(isHider){
     html += `<div class="status-banner brick-bg">
       <div style="font-family:'Anton',sans-serif;font-size:20px;">GO HIDE!</div>
-      <div class="timer" style="margin-top:6px;">${fmtTime(remaining)}</div>
+      <div class="subtle" style="margin-top:8px;color:#fff;">Playing on: <b>${esc(room.selectedMap || 'Anywhere')}</b></div>
     </div>
     <p class="subtle center">Find your spot. Once seeking starts you can tap <b>Become Wall</b> to freeze and dodge a catch — you get ${room.settings.wallUses} uses.</p>`;
   } else {
     html += `<div class="status-banner" style="background:var(--surface-2);">
       <div style="font-family:'Anton',sans-serif;font-size:20px;color:var(--seeker);">NO PEEKING</div>
-      <div class="timer" style="margin-top:6px;">${fmtTime(remaining)}</div>
-      <p class="subtle" style="margin-top:8px;">Hiders are hiding. Seeking starts automatically.</p>
+      <div class="subtle" style="margin-top:8px;">Playing on: <b style="color:var(--text)">${esc(room.selectedMap || 'Anywhere')}</b></div>
+      <p class="subtle" style="margin-top:8px;">Hiders are hiding. ${isHost ? 'Tap below once everyone is ready.' : 'Waiting for the host to start seeking.'}</p>
     </div>`;
+  }
+  if(isHost){
+    html += `<button class="btn btn-primary" onclick="actStartSeeking()">Everyone's Hidden — Start Seeking</button>`;
   }
   html += renderPlayerList(room, false);
   return html;
@@ -807,7 +843,8 @@ function renderSeeking(){
   const t = now();
   const remaining = room.settings.seekSec*1000 - (t-room.phaseStartedAt);
 
-  let html = `<div class="timer-label">Time Left</div><div class="timer center">${fmtTime(remaining)}</div>`;
+  let html = `<div class="timer-label">Time Left</div><div class="timer center">${fmtTime(remaining)}</div>
+    <p class="subtle center" style="margin-top:2px;">Playing on: <b style="color:var(--text)">${esc(room.selectedMap || 'Anywhere')}</b></p>`;
 
   if(me && me.out){
     html += `<div class="status-banner" style="background:var(--surface-2);margin-top:12px;">
@@ -905,6 +942,32 @@ function renderEnded(){
   return html;
 }
 
+function renderMapVoteCard(room){
+  const options = room.settings.mapOptions || [];
+  const votes = room.votes || {};
+  const counts = {};
+  options.forEach(m=>counts[m]=0);
+  Object.values(votes).forEach(v=>{ if(counts[v]!==undefined) counts[v]++; });
+  const myVote = votes[S.username];
+  const totalVotes = Object.keys(votes).length;
+  let html = `<div class="card">
+    <h3 style="margin-bottom:4px;">Vote for a Map</h3>
+    <p class="subtle" style="margin-bottom:12px;">Whichever spot has the most votes is where you'll play.</p>`;
+  options.forEach(m=>{
+    const isMine = myVote===m;
+    const pct = totalVotes>0 ? Math.round((counts[m]/totalVotes)*100) : 0;
+    html += `<div class="player-row">
+      <div>
+        <div class="player-name">${esc(m)} ${isMine?'<span class="you">YOUR VOTE</span>':''}</div>
+        <div class="subtle" style="font-size:12px;margin-top:2px;">${counts[m]} vote${counts[m]===1?'':'s'}${totalVotes>0?' · '+pct+'%':''}</div>
+      </div>
+      <button class="btn ${isMine?'btn-hider':'btn-ghost'}" style="width:auto;padding:8px 14px;font-size:13px;" onclick="actVoteMap('${esc(m)}')">${isMine?'Voted':'Vote'}</button>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
 function renderPlayerList(room, showStatus){
   const t = now();
   let html = '<div class="card"><h3 style="margin-bottom:8px;">Players</h3>';
@@ -938,24 +1001,28 @@ function renderRulesModal(){
       <button class="close-modal" onclick="toggleRules()">✕</button>
       <h2>How to Play</h2>
       <div class="rule-block">
-        <div class="rule-title"><span class="num">1</span>Roles</div>
-        <p class="subtle">The host picks how many Seekers there are — everyone else is a Hider. Hiders go hide somewhere in real life while Seekers wait.</p>
+        <div class="rule-title"><span class="num">1</span>Vote for a Map</div>
+        <p class="subtle">In the lobby, everyone votes on where to play. Whichever spot has the most votes is locked in for the round.</p>
       </div>
       <div class="rule-block">
-        <div class="rule-title"><span class="num">2</span>Become Wall</div>
+        <div class="rule-title"><span class="num">2</span>Roles</div>
+        <p class="subtle">The host picks how many Seekers there are — everyone else is a Hider. Hiders go hide somewhere in the chosen spot while Seekers wait. There's no countdown — the host taps "Start Seeking" once everyone's ready.</p>
+      </div>
+      <div class="rule-block">
+        <div class="rule-title"><span class="num">3</span>Become Wall</div>
         <p class="subtle">Each Hider gets a limited number of "Become Wall" taps. Tapping it shields you for a short window — if a Seeker tries to catch you during that time, the catch fails. There's a cooldown before you can use it again.</p>
       </div>
       <div class="rule-block">
-        <div class="rule-title"><span class="num">3</span>Catching</div>
+        <div class="rule-title"><span class="num">4</span>Catching</div>
         <p class="subtle">When a Seeker physically finds a Hider, they tap that Hider's name to catch them. If the Hider still has a call-out in reserve, they wriggle free instead of being eliminated. Once out of call-outs, a catch means they're OUT.</p>
       </div>
       <div class="rule-block">
-        <div class="rule-title"><span class="num">4</span>Turning the Tables</div>
+        <div class="rule-title"><span class="num">5</span>Turning the Tables</div>
         <p class="subtle">If a Hider spots a Seeker first, they can tap "Call Out" on that Seeker's name. Roles instantly swap: the Seeker becomes a Hider (with a short grace period to go hide), and the Hider becomes a Seeker.</p>
       </div>
       <div class="rule-block">
-        <div class="rule-title"><span class="num">5</span>Winning</div>
-        <p class="subtle">The round ends when only one player remains active, when every Hider has been caught (Seekers win), or when time runs out (Hiders win if any are still free).</p>
+        <div class="rule-title"><span class="num">6</span>Winning</div>
+        <p class="subtle">The round ends when only one player remains active, when every Hider has been caught (Seekers win), or when the seek timer runs out (Hiders win if any are still free).</p>
       </div>
     </div>
   </div>`;
