@@ -656,19 +656,26 @@ function onResize(){
 }
 
 function makeLabelSprite(text){
+  const font = 'bold 34px Inter, sans-serif';
+  const paddingX = 22;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const textWidth = measure.measureText(text).width;
+
   const c = document.createElement('canvas');
-  c.width=256; c.height=64;
+  c.width = Math.max(160, Math.ceil(textWidth) + paddingX*2);
+  c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.font='bold 34px Inter, sans-serif';
+  ctx.font = font;
   ctx.fillStyle='rgba(0,0,0,0.5)';
-  ctx.fillRect(0,0,256,64);
+  ctx.fillRect(0,0,c.width,c.height);
   ctx.fillStyle='#f3f1ea';
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(text, 128, 32);
+  ctx.fillText(text, c.width/2, c.height/2);
   const tex = new THREE.CanvasTexture(c);
   const mat = new THREE.SpriteMaterial({map:tex, depthTest:false});
   const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(2.4,0.6,1);
+  sprite.scale.set(2.4 * (c.width/256), 0.6, 1);
   sprite.position.y = 2.55;
   return sprite;
 }
