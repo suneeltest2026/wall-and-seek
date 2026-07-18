@@ -536,6 +536,15 @@ const ROOM_HALF = 20;
 const SKY_TOP = 0x1c2b52, SKY_BOTTOM = 0x15171a;
 
 // obstacle layout shared between the 3D scene and the minimap
+function shedWalls(cx, cz, half, open, color){
+  const t = 0.4, h = 2.6;
+  const walls = [];
+  if(open!=='n') walls.push({x:cx, z:cz-half, w:half*2+t, h, d:t, shape:'box', color});
+  if(open!=='s') walls.push({x:cx, z:cz+half, w:half*2+t, h, d:t, shape:'box', color});
+  if(open!=='w') walls.push({x:cx-half, z:cz, w:t, h, d:half*2+t, shape:'box', color});
+  if(open!=='e') walls.push({x:cx+half, z:cz, w:t, h, d:half*2+t, shape:'box', color});
+  return walls;
+}
 const CLIENT_MAPS = {
   warehouse: [
     {x:-10, z:-8, w:2.6, h:2.4, d:2.6, shape:'box', color:0xb0492e},
@@ -575,6 +584,24 @@ const CLIENT_MAPS = {
     {x:9,   z:9,   r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
     {x:-9,  z:9,   r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
     {x:9,   z:-9,  r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
+  ],
+  forest: [
+    ...shedWalls(-11,-11,2.8,'s',0x8a7355),
+    ...shedWalls(12,-9,2.6,'n',0x8a7355),
+    ...shedWalls(-9,13,2.4,'e',0x7a6448),
+    ...shedWalls(13,12,2.8,'w',0x7a6448),
+    {x:-3,  z:-2,  r:0.9, h:4.6, shape:'tree', color:0x2e5c3a},
+    {x:4,   z:2,   r:1.1, h:5.4, shape:'tree', color:0x3d7a4a},
+    {x:-6,  z:5,   r:0.8, h:4.0, shape:'tree', color:0x2e5c3a},
+    {x:7,   z:-4,  r:1.0, h:5.0, shape:'tree', color:0x3d7a4a},
+    {x:0,   z:-9,  r:0.9, h:4.4, shape:'tree', color:0x2e5c3a},
+    {x:-14, z:3,   r:1.2, h:5.6, shape:'tree', color:0x3d7a4a},
+    {x:15,  z:0,   r:0.9, h:4.2, shape:'tree', color:0x2e5c3a},
+    {x:2,   z:16,  r:1.0, h:4.8, shape:'tree', color:0x3d7a4a},
+    {x:-16, z:-6,  r:0.8, h:4.0, shape:'tree', color:0x2e5c3a},
+    {x:8,   z:-15, r:1.1, h:5.2, shape:'tree', color:0x3d7a4a},
+    {x:-4,  z:-15, r:0.9, h:4.4, shape:'tree', color:0x2e5c3a},
+    {x:17,  z:-8,  r:0.8, h:4.0, shape:'tree', color:0x3d7a4a},
   ],
 };
 let activeMapId = 'warehouse';
@@ -721,11 +748,49 @@ function initSceneIfNeeded(){
   animate();
   window.addEventListener('resize', onResize);
 }
+function buildTree(o){
+  const group = new THREE.Group();
+  const trunkH = o.h*0.4;
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(o.r*0.28, o.r*0.4, trunkH, 7),
+    new THREE.MeshStandardMaterial({color:0x5c4630, roughness:0.95})
+  );
+  trunk.position.y = trunkH/2;
+  trunk.castShadow = true; trunk.receiveShadow = true;
+  group.add(trunk);
+  const foliageH = o.h - trunkH;
+  const tiers = 2;
+  for(let i=0;i<tiers;i++){
+    const tierR = o.r * (1 - i*0.28);
+    const tierH = foliageH * 0.65;
+    const foliage = new THREE.Mesh(
+      new THREE.ConeGeometry(tierR, tierH, 8),
+      new THREE.MeshStandardMaterial({color:o.color||0x2e5c3a, roughness:0.85})
+    );
+    foliage.position.y = trunkH + tierH*0.5 + i*foliageH*0.42;
+    foliage.castShadow = true; foliage.receiveShadow = true;
+    group.add(foliage);
+  }
+  group.position.set(o.x, 0, o.z);
+  return group;
+}
 function buildObstacleMeshes(){
-  obstacleMeshes.forEach(m=>{ scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  obstacleMeshes.forEach(obj=>{
+    scene.remove(obj);
+    obj.traverse(child=>{
+      if(child.geometry) child.geometry.dispose();
+      if(child.material) child.material.dispose();
+    });
+  });
   obstacleMeshes = [];
   const brickTex = makeBrickTexture();
   OBSTACLES.forEach(o=>{
+    if(o.shape==='tree'){
+      const tree = buildTree(o);
+      scene.add(tree);
+      obstacleMeshes.push(tree);
+      return;
+    }
     let geo, mat;
     if(o.shape==='cylinder'){
       geo = new THREE.CylinderGeometry(o.r, o.r*1.05, o.h, 12);

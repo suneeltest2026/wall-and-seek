@@ -25,7 +25,8 @@ const CATCH_RADIUS = 2.2;
 const MAPS = [
   { id:'warehouse', name:'Warehouse' },
   { id:'ruins', name:'Ancient Ruins' },
-  { id:'arena', name:'Open Arena' }
+  { id:'arena', name:'Open Arena' },
+  { id:'forest', name:'Forest Village' }
 ];
 const MAP_IDS = MAPS.map(m=>m.id);
 
