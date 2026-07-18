@@ -22,6 +22,12 @@ const DEFAULT_SETTINGS = {
   graceSec: 8
 };
 const CATCH_RADIUS = 2.2;
+const MAPS = [
+  { id:'warehouse', name:'Warehouse' },
+  { id:'ruins', name:'Ancient Ruins' },
+  { id:'arena', name:'Open Arena' }
+];
+const MAP_IDS = MAPS.map(m=>m.id);
 
 // ---------- ROOM STORE ----------
 // rooms: code -> { code, phase, phaseStartedAt, settings, players:{name:{...}}, sockets:Map(name->ws), log:[], winner, winnerType }
@@ -57,7 +63,8 @@ function publicState(room){
   return {
     code: room.code, phase: room.phase, phaseStartedAt: room.phaseStartedAt,
     settings: room.settings, players, log: room.log,
-    winner: room.winner, winnerType: room.winnerType
+    winner: room.winner, winnerType: room.winnerType,
+    maps: MAPS, mapVotes: room.mapVotes || {}, mapId: room.mapId
   };
 }
 function broadcastState(room){
@@ -69,7 +76,7 @@ function broadcastState(room){
 function broadcastPositions(room){
   const positions = {};
   for(const [n,p] of Object.entries(room.players)){
-    positions[n] = { x:p.x||0, z:p.z||0, rotY:p.rotY||0, role:p.role, out:p.out, walled: now()<p.wallUntil };
+    positions[n] = { x:p.x||0, z:p.z||0, rotY:p.rotY||0, jumpY:p.jumpY||0, role:p.role, out:p.out, walled: now()<p.wallUntil };
   }
   const msg = JSON.stringify({type:'positions', positions});
   for(const ws of room.sockets.values()){
@@ -150,7 +157,8 @@ function handleCreateRoom(ws, msg){
     settings: {...DEFAULT_SETTINGS},
     players: { [name]: newPlayer(true) },
     sockets: new Map([[name, ws]]),
-    log: [], winner:null, winnerType:null, lastActivity: now()
+    log: [], winner:null, winnerType:null, lastActivity: now(),
+    mapVotes: {}, mapId: MAP_IDS[0]
   };
   rooms.set(code, room);
   ws.playerName = name; ws.roomCode = code;
@@ -194,12 +202,35 @@ function handleUpdateSetting(ws, msg){
   if(Number.isFinite(val)) room.settings[msg.key] = val;
   broadcastState(room);
 }
+function handleVoteMap(ws, msg){
+  const room = getRoomFor(ws); if(!room) return;
+  if(room.phase!=='lobby') return;
+  const p = room.players[ws.playerName]; if(!p) return;
+  const mapId = String(msg.mapId||'');
+  if(!MAP_IDS.includes(mapId)) return;
+  room.mapVotes = room.mapVotes || {};
+  room.mapVotes[ws.playerName] = mapId;
+  broadcastState(room);
+}
+function pickWinningMap(room){
+  const tally = {};
+  MAP_IDS.forEach(id=>tally[id]=0);
+  Object.values(room.mapVotes||{}).forEach(id=>{ if(tally[id]!==undefined) tally[id]++; });
+  let best=-1, winners=[];
+  for(const id of MAP_IDS){
+    const v = tally[id];
+    if(v>best){ best=v; winners=[id]; }
+    else if(v===best) winners.push(id);
+  }
+  return winners[Math.floor(Math.random()*winners.length)];
+}
 function handleStartGame(ws){
   const room = getRoomFor(ws); if(!room) return;
   const me = room.players[ws.playerName];
   if(!me || !me.isHost) return;
   const names = Object.keys(room.players);
   if(names.length<2) return sendError(ws, 'Need at least 2 players to start.');
+  room.mapId = pickWinningMap(room);
   const seekerCount = Math.min(room.settings.seekerCount, names.length-1);
   const shuffled = [...names].sort(()=>Math.random()-0.5);
   const seekers = new Set(shuffled.slice(0, seekerCount));
@@ -217,7 +248,8 @@ function handleStartGame(ws){
   room.phase='hiding';
   room.phaseStartedAt = now();
   room.winner=null; room.winnerType=null; room.log=[];
-  log(room, 'Round started. Hiders, find a spot!');
+  const mapName = (MAPS.find(m=>m.id===room.mapId)||{}).name || room.mapId;
+  log(room, 'Round started on '+mapName+'. Hiders, find a spot!');
   broadcastState(room);
   broadcastPositions(room);
 }
@@ -227,11 +259,12 @@ function handleMove(ws, msg){
   if(room.phase==='hiding' && p.role!=='hider') return; // seekers can't move/peek during hiding
   if(room.phase!=='hiding' && room.phase!=='seeking') return;
   if(now() < p.wallUntil) return; // frozen while a wall
-  const x = Number(msg.x), z = Number(msg.z), rotY = Number(msg.rotY);
+  const x = Number(msg.x), z = Number(msg.z), rotY = Number(msg.rotY), jumpY = Number(msg.jumpY);
   if(!Number.isFinite(x) || !Number.isFinite(z)) return;
   p.x = clamp(x, -ROOM_HALF, ROOM_HALF);
   p.z = clamp(z, -ROOM_HALF, ROOM_HALF);
   p.rotY = Number.isFinite(rotY) ? rotY : p.rotY;
+  p.jumpY = Number.isFinite(jumpY) ? clamp(jumpY, 0, 6) : 0;
   room.lastActivity = now();
 }
 function handleBecomeWall(ws){
@@ -298,6 +331,7 @@ function handlePlayAgain(ws){
   const me = room.players[ws.playerName];
   if(!me || !me.isHost) return;
   room.phase='lobby'; room.winner=null; room.winnerType=null; room.phaseStartedAt=null;
+  room.mapVotes = {};
   for(const n in room.players){
     room.players[n].role='unassigned'; room.players[n].out=false;
     room.players[n].wallUntil=0; room.players[n].graceUntil=0;
@@ -320,6 +354,7 @@ wss.on('connection', (ws)=>{
       case 'joinRoom': return handleJoinRoom(ws, msg);
       case 'updateSetting': return handleUpdateSetting(ws, msg);
       case 'startGame': return handleStartGame(ws);
+      case 'voteMap': return handleVoteMap(ws, msg);
       case 'move': return handleMove(ws, msg);
       case 'becomeWall': return handleBecomeWall(ws);
       case 'catch': return handleCatch(ws, msg);

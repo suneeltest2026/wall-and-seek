@@ -59,6 +59,16 @@
   .player-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--surface-3);}
   .player-row:last-child{border-bottom:none;}
   .error-text{color:var(--seeker);font-size:13px;text-align:center;}
+  .map-vote-btn{
+    display:flex;justify-content:space-between;align-items:center;width:100%;
+    background:var(--surface-2);border:1px solid var(--surface-3);color:var(--text);
+    padding:12px 14px;border-radius:10px;margin-bottom:8px;cursor:pointer;
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
+  }
+  .map-vote-btn:last-child{margin-bottom:0;}
+  .map-vote-btn.voted{border-color:var(--yellow);background:rgba(255,201,60,0.12);color:var(--yellow);}
+  .map-vote-btn .count{font-family:'Anton',sans-serif;font-size:12px;color:var(--text-dim);letter-spacing:0.5px;}
+  .map-vote-btn.voted .count{color:var(--yellow);}
 
   #hud-top{
     position:fixed;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;
@@ -92,8 +102,20 @@
   }
   #wall-btn{background:var(--hider);color:#0e2119;}
   #wall-btn:disabled{opacity:0.3;}
+  #wall-btn.shielded:disabled{
+    opacity:1;color:#f3f1ea;background:var(--brick);
+    box-shadow:0 0 14px rgba(176,73,46,0.9);
+    animation:pulse-glow 1s ease-in-out infinite;
+  }
   #catch-btn{background:var(--seeker);color:#2a0a0a;display:none;}
   #callout-btn{background:var(--yellow);color:#1a1a1a;display:none;}
+  #jump-btn{
+    position:fixed;left:156px;bottom:40px;width:64px;height:64px;border-radius:50%;
+    background:rgba(255,201,60,0.18);border:2px solid rgba(255,201,60,0.55);
+    color:var(--yellow);font-size:26px;display:flex;align-items:center;justify-content:center;
+    z-index:15;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform 0.08s ease;
+  }
+  #jump-btn:active{transform:scale(0.88);background:rgba(255,201,60,0.35);}
   #rules-fab{
     position:fixed;bottom:150px;right:16px;background:rgba(38,42,46,0.9);border:1px solid var(--surface-3);
     color:var(--text);width:42px;height:42px;border-radius:50%;font-family:'Anton',sans-serif;font-size:16px;
@@ -151,6 +173,7 @@
   <div id="lobby-view" class="hidden" style="width:100%;max-width:400px;">
     <div class="card"><h2>Lobby</h2><p class="subtle" id="lobby-sub"></p></div>
     <div class="card"><h3 style="margin-bottom:8px;">Players</h3><div id="lobby-players"></div></div>
+    <div class="card"><h3 style="margin-bottom:8px;">Vote for a Map</h3><div id="map-vote-list"></div></div>
     <div class="card hidden" id="host-settings">
       <h3 style="margin-bottom:12px;">Round Settings</h3>
       <div class="field"><label>Number of Seekers</label>
@@ -184,6 +207,7 @@
       <div id="joystick-base"></div>
       <div id="joystick-nub"></div>
     </div>
+    <div id="jump-btn">⤴</div>
     <div id="action-buttons">
       <button class="action-btn" id="catch-btn">Tag / Catch</button>
       <button class="action-btn" id="callout-btn">Call Out</button>
@@ -311,7 +335,8 @@ const SoundFX = (()=>{
     if(win){ tone(523,0.15,'square',0.15,0); tone(659,0.15,'square',0.15,0.15); tone(784,0.3,'square',0.16,0.3); }
     else { tone(300,0.3,'sawtooth',0.12,0); tone(220,0.4,'sawtooth',0.12,0.25); }
   }
-  return { footstep, uiClick, wallOn, catchSuccess, escapeFree, swap, roundStart, roundEnd, isMuted, toggleMuted, ensure };
+  function jump(){ tone(380,0.12,'sine',0.1,0,620); }
+  return { footstep, uiClick, wallOn, catchSuccess, escapeFree, swap, roundStart, roundEnd, jump, isMuted, toggleMuted, ensure };
 })();
 
 const muteBtnEl = document.getElementById('mute-btn');
@@ -382,6 +407,7 @@ function onState(room){
   const me = room.players[myName];
   if(!me){ return; }
   const prevPhase = lastPhase;
+  if(room.mapId) setActiveMap(room.mapId);
 
   if(room.log){
     if(room.log.length < lastLogCount) lastLogCount = 0;
@@ -400,6 +426,22 @@ function onState(room){
     document.getElementById('lobby-players').innerHTML = list.map(([n,p])=>
       '<div class="player-row"><div>'+esc(n)+(n===myName?' <span class="pill pill-host" style="background:rgba(255,201,60,.1);">YOU</span>':'')+'</div>'+(p.isHost?'<span class="pill pill-host">Host</span>':'')+'</div>'
     ).join('');
+
+    const maps = room.maps || [];
+    const mapVotes = room.mapVotes || {};
+    const tally = {}; maps.forEach(m=>tally[m.id]=0);
+    Object.values(mapVotes).forEach(id=>{ if(tally[id]!==undefined) tally[id]++; });
+    const myVote = mapVotes[myName];
+    document.getElementById('map-vote-list').innerHTML = maps.map(m=>{
+      const votes = tally[m.id]||0;
+      return '<div class="map-vote-btn'+(myVote===m.id?' voted':'')+'" data-map="'+m.id+'">'+
+        '<span>'+esc(m.name)+(myVote===m.id?' ✓':'')+'</span>'+
+        '<span class="count">'+votes+' vote'+(votes===1?'':'s')+'</span></div>';
+    }).join('');
+    document.querySelectorAll('.map-vote-btn').forEach(el=>{
+      el.onclick = ()=>{ SoundFX.ensure(); SoundFX.uiClick(); send({type:'voteMap', mapId: el.dataset.map}); };
+    });
+
     document.getElementById('host-settings').classList.toggle('hidden', !me.isHost);
     document.getElementById('btn-start').classList.toggle('hidden', !me.isHost);
     if(me.isHost){
@@ -412,7 +454,8 @@ function onState(room){
   } else {
     document.getElementById('lobby-screen').style.display='none';
     document.getElementById('game-ui').classList.remove('hidden');
-    document.getElementById('hud-room').textContent = 'ROOM '+room.code;
+    const mapName = (room.maps||[]).find(m=>m.id===room.mapId);
+    document.getElementById('hud-room').textContent = 'ROOM '+room.code + (mapName ? ' · '+mapName.name : '');
   }
 
   if(room.phase==='ended'){
@@ -457,9 +500,11 @@ function onState(room){
     wallBtn.style.display='block';
     const walled = now()<me.wallUntil;
     wallBtn.disabled = me.wallUsesLeft<=0 || walled;
-    wallBtn.textContent = walled ? 'Shielded' : ('Become Wall ('+me.wallUsesLeft+')');
+    wallBtn.classList.toggle('shielded', walled);
+    wallBtn.textContent = walled ? 'Shielded 🛡' : ('Become Wall ('+me.wallUsesLeft+')');
   } else {
     wallBtn.style.display='none';
+    wallBtn.classList.remove('shielded');
   }
 
   if(room.phase!==lastPhase){
@@ -483,21 +528,56 @@ const ROOM_HALF = 20;
 const SKY_TOP = 0x1c2b52, SKY_BOTTOM = 0x15171a;
 
 // obstacle layout shared between the 3D scene and the minimap
-const OBSTACLES = [
-  {x:-10, z:-8, w:2.6, h:2.4, d:2.6, shape:'box', color:0xb0492e},
-  {x:10,  z:8,  w:2.6, h:2.4, d:2.6, shape:'box', color:0xb0492e},
-  {x:7,   z:-11,w:2,   h:2,   d:2,   shape:'box', color:0xb0492e},
-  {x:-7,  z:11, w:2,   h:2,   d:2,   shape:'box', color:0xb0492e},
-  {x:0,   z:13, w:3,   h:1.6, d:3,   shape:'box', color:0x556070},
-  {x:13,  z:-2, w:1.6, h:2.6, d:1.6, shape:'box', color:0x556070},
-  {x:-13, z:2,  w:1.6, h:2.6, d:1.6, shape:'box', color:0x556070},
-  {x:5,   z:4,  r:1.1, h:3.4, shape:'cylinder', color:0x7a7268},
-  {x:-5,  z:-4, r:1.1, h:3.4, shape:'cylinder', color:0x7a7268},
-  {x:-15, z:-15,r:1.3, h:3.8, shape:'cylinder', color:0x7a7268},
-  {x:15,  z:15, r:1.3, h:3.8, shape:'cylinder', color:0x7a7268},
-  {x:0,   z:-16,w:5,   h:1.4, d:1.2, shape:'box', color:0xb0492e},
-  {x:0,   z:16, w:5,   h:1.4, d:1.2, shape:'box', color:0xb0492e},
-];
+const CLIENT_MAPS = {
+  warehouse: [
+    {x:-10, z:-8, w:2.6, h:2.4, d:2.6, shape:'box', color:0xb0492e},
+    {x:10,  z:8,  w:2.6, h:2.4, d:2.6, shape:'box', color:0xb0492e},
+    {x:7,   z:-11,w:2,   h:2,   d:2,   shape:'box', color:0xb0492e},
+    {x:-7,  z:11, w:2,   h:2,   d:2,   shape:'box', color:0xb0492e},
+    {x:0,   z:13, w:3,   h:1.6, d:3,   shape:'box', color:0x556070},
+    {x:13,  z:-2, w:1.6, h:2.6, d:1.6, shape:'box', color:0x556070},
+    {x:-13, z:2,  w:1.6, h:2.6, d:1.6, shape:'box', color:0x556070},
+    {x:5,   z:4,  r:1.1, h:3.4, shape:'cylinder', color:0x7a7268},
+    {x:-5,  z:-4, r:1.1, h:3.4, shape:'cylinder', color:0x7a7268},
+    {x:-15, z:-15,r:1.3, h:3.8, shape:'cylinder', color:0x7a7268},
+    {x:15,  z:15, r:1.3, h:3.8, shape:'cylinder', color:0x7a7268},
+    {x:0,   z:-16,w:5,   h:1.4, d:1.2, shape:'box', color:0xb0492e},
+    {x:0,   z:16, w:5,   h:1.4, d:1.2, shape:'box', color:0xb0492e},
+  ],
+  ruins: [
+    {x:-14, z:-14, r:1.2, h:4.2, shape:'cylinder', color:0x7a7268},
+    {x:14,  z:14,  r:1.2, h:3.4, shape:'cylinder', color:0x7a7268},
+    {x:-14, z:14,  r:1.0, h:2.6, shape:'cylinder', color:0x7a7268},
+    {x:14,  z:-14, r:1.4, h:4.8, shape:'cylinder', color:0x7a7268},
+    {x:0,   z:0,   r:1.6, h:2.0, shape:'cylinder', color:0x7a7268},
+    {x:-6,  z:6,   w:2.2, h:1.2, d:2.2, shape:'box', color:0xb0492e},
+    {x:6,   z:-6,  w:2.2, h:1.2, d:2.2, shape:'box', color:0xb0492e},
+    {x:8,   z:8,   w:1.6, h:1.6, d:1.6, shape:'box', color:0xb0492e},
+    {x:-8,  z:-8,  w:1.6, h:1.6, d:1.6, shape:'box', color:0xb0492e},
+    {x:0,   z:-16, w:4,   h:1.0, d:1.2, shape:'box', color:0xb0492e},
+    {x:0,   z:16,  w:4,   h:1.0, d:1.2, shape:'box', color:0xb0492e},
+  ],
+  arena: [
+    {x:0,   z:0,   r:2.2, h:3.2, shape:'cylinder', color:0x556070},
+    {x:-12, z:0,   w:2.6, h:2.6, d:2.6, shape:'box', color:0xb0492e},
+    {x:12,  z:0,   w:2.6, h:2.6, d:2.6, shape:'box', color:0xb0492e},
+    {x:0,   z:-12, w:2.6, h:2.6, d:2.6, shape:'box', color:0xb0492e},
+    {x:0,   z:12,  w:2.6, h:2.6, d:2.6, shape:'box', color:0xb0492e},
+    {x:-9,  z:-9,  r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
+    {x:9,   z:9,   r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
+    {x:-9,  z:9,   r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
+    {x:9,   z:-9,  r:1.3, h:3.6, shape:'cylinder', color:0x7a7268},
+  ],
+};
+let activeMapId = 'warehouse';
+let OBSTACLES = CLIENT_MAPS[activeMapId];
+let obstacleMeshes = [];
+function setActiveMap(mapId){
+  if(!CLIENT_MAPS[mapId] || mapId===activeMapId) return;
+  activeMapId = mapId;
+  OBSTACLES = CLIENT_MAPS[mapId];
+  if(sceneReady) buildObstacleMeshes();
+}
 
 function makeFloorTexture(){
   const size = 256;
@@ -627,7 +707,15 @@ function initSceneIfNeeded(){
     scene.add(m);
   });
 
-  // obstacles for cover, built from the shared OBSTACLES layout
+  buildObstacleMeshes();
+
+  clock = new THREE.Clock();
+  animate();
+  window.addEventListener('resize', onResize);
+}
+function buildObstacleMeshes(){
+  obstacleMeshes.forEach(m=>{ scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  obstacleMeshes = [];
   const brickTex = makeBrickTexture();
   OBSTACLES.forEach(o=>{
     let geo, mat;
@@ -642,11 +730,8 @@ function initSceneIfNeeded(){
     m.position.set(o.x, o.h/2, o.z);
     m.castShadow = true; m.receiveShadow = true;
     scene.add(m);
+    obstacleMeshes.push(m);
   });
-
-  clock = new THREE.Clock();
-  animate();
-  window.addEventListener('resize', onResize);
 }
 function onResize(){
   if(!renderer) return;
@@ -895,6 +980,28 @@ window.addEventListener('mouseup', ()=>{ if(joyActive){ joyActive=false; joyRese
 
 let myPos = {x:0, z:0, rotY:0};
 let lastSent = 0;
+let jumpVel = 0, jumpY = 0;
+
+function tryJump(){
+  if(!roomState) return;
+  const me = roomState.players[myName];
+  if(!me || me.out) return;
+  const phase = roomState.phase;
+  if(phase==='hiding' && me.role!=='hider') return;
+  if(phase!=='hiding' && phase!=='seeking') return;
+  if(now() < me.wallUntil) return;
+  if(jumpY > 0.02) return;
+  SoundFX.ensure(); SoundFX.jump();
+  jumpVel = 6.2;
+}
+window.addEventListener('keydown', e=>{
+  if((e.key===' '||e.code==='Space') && document.activeElement.tagName!=='INPUT'){
+    e.preventDefault(); tryJump();
+  }
+});
+const jumpBtn = document.getElementById('jump-btn');
+jumpBtn.addEventListener('touchstart', e=>{ e.preventDefault(); tryJump(); }, {passive:false});
+jumpBtn.addEventListener('mousedown', ()=> tryJump());
 
 document.getElementById('wall-btn').onclick = ()=>{ SoundFX.ensure(); send({type:'becomeWall'}); };
 document.getElementById('catch-btn').onclick = ()=>{
@@ -940,6 +1047,12 @@ function updateMovement(dt){
   if(phase!=='hiding' && phase!=='seeking') return;
   if(now() < me.wallUntil) return; // frozen while a wall
 
+  if(jumpVel!==0 || jumpY>0){
+    jumpVel -= 16*dt;
+    jumpY = Math.max(0, jumpY + jumpVel*dt);
+    if(jumpY<=0){ jumpY=0; jumpVel=0; }
+  }
+
   let kx=0, kz=0;
   if(keys['w']||keys['arrowup']) kz -= 1;
   if(keys['s']||keys['arrowdown']) kz += 1;
@@ -958,10 +1071,10 @@ function updateMovement(dt){
   const t = performance.now();
   if(t-lastSent>60){
     lastSent = t;
-    send({type:'move', x:myPos.x, z:myPos.z, rotY:myPos.rotY});
+    send({type:'move', x:myPos.x, z:myPos.z, rotY:myPos.rotY, jumpY});
   }
   // reflect locally immediately for responsiveness
-  positions[myName] = {x:myPos.x, z:myPos.z, rotY:myPos.rotY, role:me.role, out:me.out, walled: now()<me.wallUntil};
+  positions[myName] = {x:myPos.x, z:myPos.z, rotY:myPos.rotY, role:me.role, out:me.out, walled: now()<me.wallUntil, jumpY};
 }
 
 function updateAvatars(dt){
@@ -983,6 +1096,7 @@ function updateAvatars(dt){
 
     rec.group.position.x += (pos.x - rec.group.position.x) * 0.35;
     rec.group.position.z += (pos.z - rec.group.position.z) * 0.35;
+    rec.group.position.y += ((pos.jumpY||0) - rec.group.position.y) * 0.5;
     rec.group.rotation.y = pos.rotY||0;
 
     const walled = now() < (p.wallUntil||0) || !!pos.walled;
