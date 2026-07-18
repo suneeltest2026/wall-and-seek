@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: wall-and-seek-3d
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
