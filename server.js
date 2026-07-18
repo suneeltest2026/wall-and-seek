@@ -230,6 +230,8 @@ function handleStartGame(ws){
   if(!me || !me.isHost) return;
   const names = Object.keys(room.players);
   if(names.length<2) return sendError(ws, 'Need at least 2 players to start.');
+  const votedCount = Object.keys(room.mapVotes||{}).length;
+  if(votedCount < names.length) return sendError(ws, 'Everyone must vote for a map before starting.');
   room.mapId = pickWinningMap(room);
   const seekerCount = Math.min(room.settings.seekerCount, names.length-1);
   const shuffled = [...names].sort(()=>Math.random()-0.5);

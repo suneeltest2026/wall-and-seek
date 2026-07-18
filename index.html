@@ -173,7 +173,7 @@
   <div id="lobby-view" class="hidden" style="width:100%;max-width:400px;">
     <div class="card"><h2>Lobby</h2><p class="subtle" id="lobby-sub"></p></div>
     <div class="card"><h3 style="margin-bottom:8px;">Players</h3><div id="lobby-players"></div></div>
-    <div class="card"><h3 style="margin-bottom:8px;">Vote for a Map</h3><div id="map-vote-list"></div></div>
+    <div class="card"><h3 style="margin-bottom:8px;">Vote for a Map</h3><div id="map-vote-list"></div><p class="subtle" id="map-vote-status" style="margin-top:10px;margin-bottom:0;"></p></div>
     <div class="card hidden" id="host-settings">
       <h3 style="margin-bottom:12px;">Round Settings</h3>
       <div class="field"><label>Number of Seekers</label>
@@ -441,9 +441,17 @@ function onState(room){
     document.querySelectorAll('.map-vote-btn').forEach(el=>{
       el.onclick = ()=>{ SoundFX.ensure(); SoundFX.uiClick(); send({type:'voteMap', mapId: el.dataset.map}); };
     });
+    const votedCount = Object.keys(mapVotes).length;
+    const totalCount = list.length;
+    const allVoted = votedCount>=totalCount;
+    document.getElementById('map-vote-status').textContent = allVoted
+      ? 'Everyone has voted.'
+      : votedCount+' of '+totalCount+' players have voted — everyone must vote before the round can start.';
 
     document.getElementById('host-settings').classList.toggle('hidden', !me.isHost);
     document.getElementById('btn-start').classList.toggle('hidden', !me.isHost);
+    document.getElementById('btn-start').disabled = !allVoted;
+    document.getElementById('btn-start').textContent = allVoted ? 'Start Round' : 'Waiting for votes ('+votedCount+'/'+totalCount+')';
     if(me.isHost){
       const s = room.settings;
       for(const key of ['seekerCount','hideSec','seekSec','wallUses','wallShieldSec','calloutUses','graceSec']){
